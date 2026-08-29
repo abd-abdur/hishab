@@ -101,6 +101,54 @@ describe("verifyStatement", () => {
     expect(result.reconciliationDeltaMinor).toBe(0);
   });
 
+  it("reconciles a credit-card statement where spending raises the balance", () => {
+    const result = verifyStatement(
+      batch({ openingBalance: 2450, closingBalance: 3000 }, [
+        {
+          date: "02/08/2026",
+          description: "CARREFOUR",
+          amount: 800,
+          direction: "debit",
+          runningBalance: 3250,
+        },
+        {
+          date: "12/08/2026",
+          description: "PAYMENT RECEIVED",
+          amount: 250,
+          direction: "credit",
+          runningBalance: 3000,
+        },
+      ]),
+    );
+    expect(result.reconciliationStatus).toBe("reconciled");
+    expect(result.reconciliationDeltaMinor).toBe(0);
+    expect(result.transactions.every((t) => t.confidence === 1)).toBe(true);
+  });
+
+  it("detects card polarity from running balances even when totals mismatch", () => {
+    const result = verifyStatement(
+      batch({ openingBalance: 1000, closingBalance: 1600 }, [
+        {
+          date: "01/08/2026",
+          description: "A",
+          amount: 300,
+          direction: "debit",
+          runningBalance: 1300,
+        },
+        {
+          date: "02/08/2026",
+          description: "B",
+          amount: 200,
+          direction: "debit",
+          runningBalance: 1500,
+        },
+      ]),
+    );
+    // card polarity chosen (balance rises with debits); 1000+500 = 1500 ≠ 1600
+    expect(result.reconciliationStatus).toBe("mismatch");
+    expect(result.reconciliationDeltaMinor).toBe(-10000);
+  });
+
   it("flags a mismatch with the exact delta", () => {
     const result = verifyStatement(
       batch({ openingBalance: 1000, closingBalance: 1200 }, [

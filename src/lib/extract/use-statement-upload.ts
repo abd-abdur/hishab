@@ -128,14 +128,23 @@ export function useStatementUpload() {
         releaseParse();
       }
 
-      // 2. stream through the analysis endpoint
+      // 2. stream through the analysis endpoint. The watchdog aborts if the
+      // server goes quiet for too long, so the UI can never hang silently.
       const releaseAnalyze = await analyzeSemaphore.current.acquire();
+      const controller = new AbortController();
+      const STALL_MS = 120_000;
+      let stallTimer = setTimeout(() => controller.abort(), STALL_MS);
+      const resetStall = () => {
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => controller.abort(), STALL_MS);
+      };
       try {
         update(state.id, { status: "analyzing", stage: "extracting" });
         const response = await fetch("/api/ingest", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ fileName: state.fileName, fileType: state.fileType, pages }),
+          signal: controller.signal,
         });
         if (!response.ok || !response.body) {
           throw new Error(
@@ -151,6 +160,7 @@ export function useStatementUpload() {
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
+          resetStall();
           buffered += decoder.decode(value, { stream: true });
           const lines = buffered.split("\n");
           buffered = lines.pop() ?? "";
@@ -181,40 +191,49 @@ export function useStatementUpload() {
           ),
         );
       } catch (error) {
+        const aborted = error instanceof DOMException && error.name === "AbortError";
         update(state.id, {
           status: "error",
-          error: error instanceof Error ? error.message : "Analysis failed. Please try again.",
+          error: aborted
+            ? "The analysis stopped responding and was cancelled. Please try this file again."
+            : error instanceof Error
+              ? error.message
+              : "Analysis failed. Please try again.",
         });
       } finally {
+        clearTimeout(stallTimer);
         releaseAnalyze();
       }
     },
     [update],
   );
 
+  // Live mirror of the list length so addFiles never depends on stale state
+  // and never does work inside a setState updater (which must stay pure).
+  const fileCountRef = useRef(0);
+
   const addFiles = useCallback(
     (incoming: File[]): string | null => {
       const accepted: Array<{ state: UploadFileState; file: File }> = [];
       let rejection: string | null = null;
+      const room = MAX_FILES - fileCountRef.current;
 
-      setFiles((prev) => {
-        const room = MAX_FILES - prev.length;
-        const next = [...prev];
-        for (const file of incoming) {
-          if (accepted.length >= room) {
-            rejection = `Up to ${MAX_FILES} files at a time.`;
-            break;
-          }
-          const fileType = detectFileType(file);
-          if (!fileType) {
-            rejection = `${file.name}: only PDF, JPG/PNG, CSV and Excel files are supported.`;
-            continue;
-          }
-          if (file.size > MAX_FILE_BYTES) {
-            rejection = `${file.name} is larger than 15 MB.`;
-            continue;
-          }
-          const state: UploadFileState = {
+      for (const file of incoming) {
+        if (accepted.length >= room) {
+          rejection = `Up to ${MAX_FILES} files at a time.`;
+          break;
+        }
+        const fileType = detectFileType(file);
+        if (!fileType) {
+          rejection = `${file.name}: only PDF, JPG/PNG, CSV and Excel files are supported.`;
+          continue;
+        }
+        if (file.size > MAX_FILE_BYTES) {
+          rejection = `${file.name} is larger than 15 MB.`;
+          continue;
+        }
+        accepted.push({
+          state: {
             id: crypto.randomUUID(),
             fileName: file.name,
             fileType,
@@ -227,15 +246,17 @@ export function useStatementUpload() {
             rowsFound: 0,
             draft: null,
             error: null,
-          };
-          next.push(state);
-          accepted.push({ state, file });
-        }
-        return next;
-      });
+          },
+          file,
+        });
+      }
 
-      for (const { state, file } of accepted) {
-        void processFile(state, file);
+      if (accepted.length > 0) {
+        fileCountRef.current += accepted.length;
+        setFiles((prev) => [...prev, ...accepted.map((a) => a.state)]);
+        for (const { state, file } of accepted) {
+          void processFile(state, file);
+        }
       }
       return rejection;
     },
@@ -243,6 +264,7 @@ export function useStatementUpload() {
   );
 
   const removeFile = useCallback((id: string) => {
+    fileCountRef.current = Math.max(0, fileCountRef.current - 1);
     setFiles((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
@@ -252,7 +274,10 @@ export function useStatementUpload() {
     );
   }, []);
 
-  const reset = useCallback(() => setFiles([]), []);
+  const reset = useCallback(() => {
+    fileCountRef.current = 0;
+    setFiles([]);
+  }, []);
 
   return { files, addFiles, removeFile, updateDraftRows, reset };
 }

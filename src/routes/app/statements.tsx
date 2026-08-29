@@ -60,15 +60,17 @@ function StatementsPage() {
   );
 
   const commitMutation = useMutation({
-    mutationFn: commitStatementFn,
+    mutationFn: ({
+      fileId: _fileId,
+      ...input
+    }: Parameters<typeof commitStatementFn>[0] & { fileId: string }) => commitStatementFn(input),
     onSuccess: (result, variables) => {
       toast.success(
         result.skippedDuplicates > 0
           ? `${result.inserted} transactions imported · ${result.skippedDuplicates} already existed`
           : `${result.inserted} transactions imported`,
       );
-      const committed = files.find((f) => f.draft === variables.data);
-      if (committed) removeFile(committed.id);
+      removeFile(variables.fileId);
       setReviewingId(null);
       void queryClient.invalidateQueries();
     },
@@ -205,6 +207,7 @@ function StatementsPage() {
                   disabled={commitMutation.isPending}
                   onClick={() =>
                     commitMutation.mutate({
+                      fileId: reviewing.id,
                       data: { statement: reviewing.draft!.statement, rows: reviewing.draft!.rows },
                     })
                   }

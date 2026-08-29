@@ -1,7 +1,12 @@
 import { memo } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { formatMoney, formatMoneyCompact } from "@/lib/money";
+import { formatMoney, toMajorUnits } from "@/lib/money";
+
+const axisFormatter = new Intl.NumberFormat("en-AE", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 type MonthRow = { month: string; spendMinor: number; incomeMinor: number };
 
@@ -31,12 +36,10 @@ export const MonthlyTrend = memo(function MonthlyTrend({
             tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              formatMoneyCompact(v, currency).replace(`${currency} `, "")
-            }
+            tickFormatter={(v: number) => axisFormatter.format(toMajorUnits(v, currency))}
             tickLine={false}
             axisLine={false}
-            width={44}
+            width={48}
             tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
           />
           <Tooltip

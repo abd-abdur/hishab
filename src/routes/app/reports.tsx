@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChartColumn } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { CategoryDot } from "@/components/app/category-icon";
 import { EmptyState } from "@/components/app/empty-state";
@@ -50,12 +50,27 @@ function ReportsPage() {
   const monthOptions = useMemo(() => lastMonths(12), []);
   const [month, setMonth] = useState(monthOptions[0] as string);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [autoAnchored, setAutoAnchored] = useState(false);
 
   const { data, isPending } = useQuery({
     queryKey: ["reports", month],
     queryFn: () => getReportsFn({ data: { month } }),
     staleTime: 60_000,
   });
+
+  // First visit lands on the calendar month; if it's empty, jump once to the
+  // latest month that actually has data instead of showing a wall of zeros.
+  useEffect(() => {
+    if (autoAnchored || !data || month !== monthOptions[0]) return;
+    const hasDataThisMonth = data.byCategory.length > 0 || data.daily.length > 0;
+    if (!hasDataThisMonth) {
+      const latest = [...data.monthly]
+        .reverse()
+        .find((m) => (m.spendMinor > 0 || m.incomeMinor > 0) && monthOptions.includes(m.month));
+      if (latest) setMonth(latest.month);
+    }
+    setAutoAnchored(true);
+  }, [autoAnchored, data, month, monthOptions]);
 
   const dayQuery = useQuery({
     queryKey: ["day", selectedDay],

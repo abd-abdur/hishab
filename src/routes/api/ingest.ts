@@ -66,7 +66,30 @@ export const Route = createFileRoute("/api/ingest")({
               });
 
               send({ stage: "verifying" });
-              const verified = verifyStatement(extracted);
+              let verified = verifyStatement(extracted);
+
+              // The fast pass rarely misses, but when the math doesn't
+              // reconcile, re-read the statement once with deeper reasoning
+              // and keep whichever result the arithmetic vouches for.
+              if (verified.reconciliationStatus === "mismatch") {
+                send({ stage: "rechecking" });
+                try {
+                  const careful = await extractStatement(pages as IngestPage[], {
+                    isTabular: fileType === "csv" || fileType === "xlsx",
+                    effort: "careful",
+                  });
+                  const reVerified = verifyStatement(careful);
+                  const better =
+                    reVerified.reconciliationStatus === "reconciled" ||
+                    (reVerified.reconciliationStatus === "mismatch" &&
+                      Math.abs(reVerified.reconciliationDeltaMinor ?? Infinity) <
+                        Math.abs(verified.reconciliationDeltaMinor ?? Infinity));
+                  if (better) verified = reVerified;
+                } catch {
+                  // keep the fast-pass result; the mismatch badge tells the user
+                }
+              }
+
               if (verified.transactions.length === 0) {
                 send({
                   stage: "error",

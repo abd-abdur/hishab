@@ -158,8 +158,44 @@ export function verifyStatement(batch: ExtractBatch): VerifiedStatement {
     if (verified) transactions.push(verified);
   }
 
-  // Per-row running-balance validation: delta between consecutive printed
-  // balances must equal the signed amount of the later row.
+  // Statement polarity: a bank balance falls when money leaves; a credit-card
+  // balance RISES with spending. Detect which one this statement is before
+  // judging any row, from printed running balances (majority vote) with the
+  // opening/closing equation as tiebreaker.
+  const openingMinor = meta.openingBalance != null ? toMinor(meta.openingBalance, factor) : null;
+  const closingMinor = meta.closingBalance != null ? toMinor(meta.closingBalance, factor) : null;
+
+  let net = 0; // credits minus debits
+  for (const t of transactions) {
+    net += t.direction === "credit" ? t.amountMinor : -t.amountMinor;
+  }
+  const haveBalances = openingMinor != null && closingMinor != null;
+  const deltaBank = haveBalances ? openingMinor + net - closingMinor : null;
+  const deltaCard = haveBalances ? openingMinor - net - closingMinor : null;
+
+  let bankVotes = 0;
+  let cardVotes = 0;
+  for (let i = 1; i < transactions.length; i++) {
+    const prev = transactions[i - 1];
+    const curr = transactions[i];
+    if (!prev || !curr) continue;
+    if (prev.runningBalanceMinor == null || curr.runningBalanceMinor == null) continue;
+    const delta = curr.runningBalanceMinor - prev.runningBalanceMinor;
+    const signed = curr.direction === "credit" ? curr.amountMinor : -curr.amountMinor;
+    if (delta === signed) bankVotes++;
+    else if (delta === -signed) cardVotes++;
+  }
+
+  let polarity: "bank" | "card";
+  if (bankVotes !== cardVotes) {
+    polarity = bankVotes > cardVotes ? "bank" : "card";
+  } else if (deltaCard === 0 && deltaBank !== 0) {
+    polarity = "card";
+  } else {
+    polarity = "bank";
+  }
+
+  // Per-row running-balance validation under the detected polarity.
   let balanceChecked = 0;
   let balanceOk = 0;
   for (let i = 1; i < transactions.length; i++) {
@@ -168,7 +204,8 @@ export function verifyStatement(batch: ExtractBatch): VerifiedStatement {
     if (!prev || !curr) continue;
     if (prev.runningBalanceMinor == null || curr.runningBalanceMinor == null) continue;
     balanceChecked++;
-    const expected = curr.direction === "credit" ? curr.amountMinor : -curr.amountMinor;
+    const signed = curr.direction === "credit" ? curr.amountMinor : -curr.amountMinor;
+    const expected = polarity === "bank" ? signed : -signed;
     if (curr.runningBalanceMinor - prev.runningBalanceMinor === expected) {
       balanceOk++;
     } else {
@@ -176,17 +213,10 @@ export function verifyStatement(batch: ExtractBatch): VerifiedStatement {
     }
   }
 
-  const openingMinor = meta.openingBalance != null ? toMinor(meta.openingBalance, factor) : null;
-  const closingMinor = meta.closingBalance != null ? toMinor(meta.closingBalance, factor) : null;
-
   let reconciliationStatus: VerifiedStatement["reconciliationStatus"] = "no_balances";
   let reconciliationDeltaMinor: number | null = null;
-  if (openingMinor != null && closingMinor != null) {
-    let net = 0;
-    for (const t of transactions) {
-      net += t.direction === "credit" ? t.amountMinor : -t.amountMinor;
-    }
-    reconciliationDeltaMinor = openingMinor + net - closingMinor;
+  if (deltaBank != null && deltaCard != null) {
+    reconciliationDeltaMinor = polarity === "bank" ? deltaBank : deltaCard;
     reconciliationStatus = reconciliationDeltaMinor === 0 ? "reconciled" : "mismatch";
   } else if (balanceChecked > 0 && balanceOk === balanceChecked) {
     // no printed opening/closing, but every printed running balance checks out

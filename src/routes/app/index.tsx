@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCategoriesFn, getDashboardFn } from "@/lib/app-data.functions";
+import { getCategoriesFn, getDashboardFn, getInsightsFn } from "@/lib/app-data.functions";
 import { formatDate, formatDateLong, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/")({
@@ -42,6 +42,14 @@ function DashboardPage() {
     () => new Map((categories ?? []).map((c) => [c.id, c])),
     [categories],
   );
+  // model-written observations load separately so the numbers never wait
+  const { data: insightsData } = useQuery({
+    queryKey: ["insights", data?.month],
+    queryFn: () => getInsightsFn({ data: { month: data?.month as string } }),
+    enabled: Boolean(data && data.freshness.transactionCount > 0),
+    staleTime: 300_000,
+  });
+  const insights = insightsData?.insights ?? [];
 
   if (isPending || !data) {
     return (
@@ -119,7 +127,8 @@ function DashboardPage() {
             paceDelta !== null ? (
               <span className={paceDelta > 0 ? "text-negative" : "text-positive"}>
                 {paceDelta > 0 ? "+" : ""}
-                {paceDelta}% vs {monthName(pace.prevMonth)} at this point
+                {paceDelta}% vs {monthName(pace.prevMonth)}
+                {data.isCurrentMonth ? " at this point" : ""}
               </span>
             ) : (
               "No previous month to compare yet"
@@ -129,19 +138,19 @@ function DashboardPage() {
           <SpendSparkline data={pace.dailySeries} />
         </StatCard>
         <StatCard
-          label="Net cashflow this month"
+          label={`Net cashflow in ${monthName(data.month)}`}
           value={`${netMinor < 0 ? "−" : "+"}${formatMoney(Math.abs(netMinor))}`}
           tone={netMinor < 0 ? "negative" : "positive"}
           detail={`Income ${formatMoney(thisMonthIncome)}`}
         />
         <StatCard
-          label="Budget pace"
+          label={data.isCurrentMonth ? "Budget pace" : "Budgets"}
           value={
             budgets.length === 0
               ? "—"
               : overBudgetCount === 0
                 ? `On track: ${budgets.length} of ${budgets.length}`
-                : `${overBudgetCount} pacing over`
+                : `${overBudgetCount} ${data.isCurrentMonth ? "pacing over" : "went over"}`
           }
           tone={overBudgetCount > 0 ? "warning" : undefined}
           detail={
@@ -163,7 +172,9 @@ function DashboardPage() {
           </CardHeader>
           <CardContent>
             {byCategory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No spending recorded this month yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No spending recorded in {monthName(data.month)} yet.
+              </p>
             ) : (
               <CategoryBars
                 data={byCategory.map((c) => ({
@@ -223,14 +234,14 @@ function DashboardPage() {
           </CardContent>
         </Card>
 
-        {data.insights.length > 0 ? (
+        {insights.length > 0 ? (
           <Card className="md:col-span-3">
             <CardHeader>
               <CardTitle className="text-base">What the numbers say</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="grid gap-2 text-sm md:grid-cols-2">
-                {data.insights.map((insight) => (
+                {insights.map((insight) => (
                   <li key={insight} className="flex gap-2">
                     <span className="mt-2 size-1 shrink-0 rounded-full bg-primary" />
                     {insight}

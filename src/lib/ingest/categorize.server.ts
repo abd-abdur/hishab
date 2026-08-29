@@ -4,7 +4,12 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { categories, categoryRules, merchantDictionary } from "@/db/schema";
-import { categorizationModel, lowThinking, withRetry } from "./model.server";
+import {
+  categorizationModel,
+  minimalThinking,
+  MODEL_CALL_TIMEOUT_MS,
+  withRetry,
+} from "./model.server";
 import type { VerifiedTransaction } from "./verify";
 
 /**
@@ -44,12 +49,22 @@ export async function categorizeTransactions(
   const containsRules = rules.filter((r) => r.matchType === "contains");
 
   const distinctMerchants = [...new Set(transactions.map((t) => t.merchantNorm))];
+  // Dictionary keys are short ("CARREFOUR"), merchant norms are longer
+  // ("CARREFOUR MOE") — fetch candidates for every leading word-prefix so the
+  // prefix matcher has rows to work with.
+  const candidates = new Set<string>();
+  for (const merchant of distinctMerchants) {
+    const words = merchant.split(" ");
+    for (let take = 1; take <= Math.min(words.length, 4); take++) {
+      candidates.add(words.slice(0, take).join(" "));
+    }
+  }
   const dictRows =
-    distinctMerchants.length > 0
+    candidates.size > 0
       ? await db
           .select()
           .from(merchantDictionary)
-          .where(inArray(merchantDictionary.merchantNorm, distinctMerchants))
+          .where(inArray(merchantDictionary.merchantNorm, [...candidates]))
       : [];
   const dictionary = new Map(dictRows.map((d) => [d.merchantNorm, d]));
 
@@ -112,15 +127,14 @@ function matchDictionaryPrefix(
   dictRows: Array<{ merchantNorm: string; displayName: string; categorySlug: string }>,
   merchant: string,
 ): { categorySlug: string } | undefined {
+  // longest dictionary key matching on a word boundary wins
+  let best: { merchantNorm: string; displayName: string; categorySlug: string } | undefined;
   for (const row of dictRows) {
-    if (
-      merchant.startsWith(`${row.merchantNorm} `) ||
-      row.merchantNorm.startsWith(`${merchant} `)
-    ) {
-      return row;
+    if (merchant === row.merchantNorm || merchant.startsWith(`${row.merchantNorm} `)) {
+      if (!best || row.merchantNorm.length > best.merchantNorm.length) best = row;
     }
   }
-  return undefined;
+  return best;
 }
 
 async function categorizeUnknownMerchants(
@@ -159,7 +173,8 @@ async function categorizeUnknownMerchants(
         system: `Assign each merchant to exactly one category slug from this list: ${slugs.join(", ")}.
 Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
         prompt: JSON.stringify(input),
-        providerOptions: lowThinking,
+        providerOptions: minimalThinking,
+        abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
       }),
     );
     const valid = new Set(slugs);

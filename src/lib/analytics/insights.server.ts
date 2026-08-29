@@ -3,7 +3,12 @@ import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { insightsCache } from "@/db/schema";
-import { categorizationModel, lowThinking, withRetry } from "@/lib/ingest/model.server";
+import {
+  categorizationModel,
+  minimalThinking,
+  MODEL_CALL_TIMEOUT_MS,
+  withRetry,
+} from "@/lib/ingest/model.server";
 
 /**
  * The only model use outside ingestion: turn ALREADY-COMPUTED aggregates into
@@ -40,7 +45,8 @@ export async function getInsights(
         system: `You write concise spending observations for a personal finance dashboard.
 Rules: use ONLY the numbers in the provided JSON — never invent, extrapolate, or estimate figures. Write 3 to 5 observations, one sentence each, most useful first. Format amounts like "AED 1,240". Refer to months by name. No advice-column tone, no exclamation marks, no emoji. Return one observation per line, no bullets or numbering.`,
         prompt: payload,
-        providerOptions: lowThinking,
+        providerOptions: minimalThinking,
+        abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
       }),
     );
     insights = result.text

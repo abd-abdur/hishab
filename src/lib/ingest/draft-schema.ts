@@ -48,6 +48,7 @@ export type CommitInput = z.infer<typeof CommitInputSchema>;
 export type IngestProgressEvent =
   | { stage: "extracting"; done: number; total: number; rows: number }
   | { stage: "verifying" }
+  | { stage: "rechecking" }
   | { stage: "categorizing" }
   | { stage: "checking_duplicates" }
   | { stage: "ready"; draft: { statement: DraftStatement; rows: DraftRow[] } }

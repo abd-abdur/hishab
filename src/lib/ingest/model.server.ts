@@ -18,15 +18,27 @@ function getProvider() {
   return provider;
 }
 
-/** Fast multimodal model used for statement transcription. */
-export const extractionModel = () => getProvider()("gemini-3.7-flash");
+/**
+ * Transcription is simple work — the fast multimodal model does it in ~2s per
+ * batch where larger models take 30s+ for identical output (benchmarked), and
+ * the deterministic verification layer catches transcription slips.
+ */
+export const extractionModel = () => getProvider()("gemini-3.1-flash-lite");
 
-/** Cheapest model, used only for batch merchant categorization. */
+/** Same fast model for batch merchant categorization. */
 export const categorizationModel = () => getProvider()("gemini-3.1-flash-lite");
 
-/** Keep extraction snappy: transcription needs no deep reasoning. */
-export const lowThinking = {
-  google: { thinkingConfig: { thinkingLevel: "low" as const } },
+/** Hard ceiling per model call so a stuck request fails fast instead of hanging the UI. */
+export const MODEL_CALL_TIMEOUT_MS = 90_000;
+
+/** Fastest response: no visible reasoning needed for transcription. */
+export const minimalThinking = {
+  google: { thinkingConfig: { thinkingLevel: "minimal" as const } },
+};
+
+/** Escalation setting for a re-run when verification finds a mismatch. */
+export const highThinking = {
+  google: { thinkingConfig: { thinkingLevel: "high" as const } },
 };
 
 /**

@@ -7,7 +7,14 @@ import {
   ExtractBatchSchema,
   type ExtractBatch,
 } from "./extract-schema";
-import { extractionModel, lowThinking, mapPool, withRetry } from "./model.server";
+import {
+  extractionModel,
+  highThinking,
+  mapPool,
+  minimalThinking,
+  MODEL_CALL_TIMEOUT_MS,
+  withRetry,
+} from "./model.server";
 
 /**
  * Fan-out extraction: page batches run as parallel model calls through a
@@ -57,14 +64,19 @@ function batchToContent(batch: IngestPage[]): Array<TextPart | ImagePart> {
   return parts;
 }
 
-async function extractBatch(batch: IngestPage[], isTabular: boolean): Promise<ExtractBatch> {
+async function extractBatch(
+  batch: IngestPage[],
+  isTabular: boolean,
+  effort: "fast" | "careful",
+): Promise<ExtractBatch> {
   const result = await withRetry(() =>
     generateObject({
       model: extractionModel(),
       schema: ExtractBatchSchema,
       system: isTabular ? CSV_SYSTEM_PROMPT : EXTRACTION_SYSTEM_PROMPT,
       messages: [{ role: "user", content: batchToContent(batch) }],
-      providerOptions: lowThinking,
+      providerOptions: effort === "careful" ? highThinking : minimalThinking,
+      abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
     }),
   );
   return result.object;
@@ -106,6 +118,8 @@ export async function extractStatement(
   pages: IngestPage[],
   options: {
     isTabular: boolean;
+    /** "careful" re-runs with deeper reasoning when a fast pass didn't reconcile. */
+    effort?: "fast" | "careful";
     onProgress?: (done: number, total: number, rowsSoFar: number) => void;
   },
 ): Promise<ExtractBatch> {
@@ -114,7 +128,7 @@ export async function extractStatement(
   let rows = 0;
 
   const results = await mapPool(batches, MODEL_CONCURRENCY, async (batch) => {
-    const extracted = await extractBatch(batch, options.isTabular);
+    const extracted = await extractBatch(batch, options.isTabular, options.effort ?? "fast");
     done++;
     rows += extracted.transactions.length;
     options.onProgress?.(done, batches.length, rows);

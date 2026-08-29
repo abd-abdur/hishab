@@ -50,14 +50,31 @@ export const getDashboardFn = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const userId = context.userId;
     const today = new Date();
-    const month =
-      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}` as MonthKey;
 
-    const [pace, byCategory, budgetStatuses, freshness, monthly] = await Promise.all([
-      getPaceComparison(userId, today),
+    // A statement-based tracker often has no data yet for the running
+    // calendar month. Anchor the overview to the latest month that actually
+    // has transactions — an August dashboard full of zeros over July data is
+    // misleading, not honest.
+    const freshness = await getFreshness(userId);
+    let anchor = today;
+    let isCurrentMonth = true;
+    if (freshness.latestDate) {
+      const latest = new Date(`${freshness.latestDate.slice(0, 10)}T00:00:00`);
+      const sameMonth =
+        latest.getFullYear() === today.getFullYear() && latest.getMonth() === today.getMonth();
+      if (!sameMonth && latest < today) {
+        // anchor to the full extent of the latest data month
+        anchor = new Date(latest.getFullYear(), latest.getMonth() + 1, 0);
+        isCurrentMonth = false;
+      }
+    }
+    const month =
+      `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}` as MonthKey;
+
+    const [pace, byCategory, budgetStatuses, monthly] = await Promise.all([
+      getPaceComparison(userId, anchor),
       getSpendByCategory(userId, month),
-      getBudgetStatuses(userId, today),
-      getFreshness(userId),
+      getBudgetStatuses(userId, anchor),
       getMonthlyTotals(userId, 6),
     ]);
 
@@ -98,31 +115,9 @@ export const getDashboardFn = createServerFn({ method: "GET" })
         .limit(5),
     ]);
 
-    const thisMonthTotals = monthly.find((m) => m.month === month);
-    const insights =
-      freshness.transactionCount > 0
-        ? await getInsights(userId, month, {
-            month,
-            spendToDate: pace.spendToDateMinor / 100,
-            previousMonthSamePoint: pace.prevSpendSamePointMinor / 100,
-            previousMonthTotal: pace.prevMonthTotalMinor / 100,
-            incomeThisMonth: (thisMonthTotals?.incomeMinor ?? 0) / 100,
-            topCategories: byCategory.slice(0, 5).map((c) => ({
-              name: c.name,
-              spend: c.spendMinor / 100,
-            })),
-            budgets: budgetStatuses.map((b) => ({
-              category: b.categoryName,
-              limit: b.limitMinor / 100,
-              spent: b.spentMinor / 100,
-              projected: b.projectedMinor / 100,
-            })),
-            currency: "AED",
-          })
-        : [];
-
     return {
       month,
+      isCurrentMonth,
       pace,
       byCategory,
       budgets: budgetStatuses,
@@ -131,8 +126,52 @@ export const getDashboardFn = createServerFn({ method: "GET" })
       recent,
       upcoming,
       anomalies,
-      insights,
     };
+  });
+
+/**
+ * Insights are the one model-generated piece of the dashboard, so they load
+ * as their own query — the numbers must never wait on a language model.
+ */
+export const getInsightsFn = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) }))
+  .handler(async ({ data, context }) => {
+    const userId = context.userId;
+    const month = data.month as MonthKey;
+    const { to } = monthRange(month);
+    const anchor = new Date(`${to}T00:00:00`);
+    const today = new Date();
+    const effectiveAnchor = anchor < today ? anchor : today;
+
+    const [pace, byCategory, budgetStatuses, monthly] = await Promise.all([
+      getPaceComparison(userId, effectiveAnchor),
+      getSpendByCategory(userId, month),
+      getBudgetStatuses(userId, effectiveAnchor),
+      getMonthlyTotals(userId, 2),
+    ]);
+    if (byCategory.length === 0 && pace.spendToDateMinor === 0) return { insights: [] };
+
+    const thisMonthTotals = monthly.find((m) => m.month === month);
+    const insights = await getInsights(userId, month, {
+      month,
+      spendToDate: pace.spendToDateMinor / 100,
+      previousMonthSamePoint: pace.prevSpendSamePointMinor / 100,
+      previousMonthTotal: pace.prevMonthTotalMinor / 100,
+      incomeThisMonth: (thisMonthTotals?.incomeMinor ?? 0) / 100,
+      topCategories: byCategory.slice(0, 5).map((c) => ({
+        name: c.name,
+        spend: c.spendMinor / 100,
+      })),
+      budgets: budgetStatuses.map((b) => ({
+        category: b.categoryName,
+        limit: b.limitMinor / 100,
+        spent: b.spentMinor / 100,
+        projected: b.projectedMinor / 100,
+      })),
+      currency: "AED",
+    });
+    return { insights };
   });
 
 const TransactionFiltersSchema = z.object({

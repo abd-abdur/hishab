@@ -20,6 +20,8 @@ function statusLine(file: UploadFileState): string {
             : "Reading transactions…";
         case "verifying":
           return "Checking the math…";
+        case "rechecking":
+          return "Numbers didn't add up — taking a closer look…";
         case "categorizing":
           return "Categorizing…";
         case "checking_duplicates":

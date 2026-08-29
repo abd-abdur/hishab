@@ -100,7 +100,7 @@
   /* money semantics — never reuse chart colors for these */
   --positive: oklch(0.5 0.11 160);
   --negative: oklch(0.51 0.16 27);
-  --warning: oklch(0.62 0.13 75);
+  --warning: oklch(0.54 0.12 75);
 
   /* categorical scale — assigned deterministically per category, persisted */
   --chart-1: oklch(0.55 0.11 165);
@@ -179,6 +179,22 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* The surfaces the browser draws still carry the design. */
+  ::selection {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+
+  html {
+    accent-color: var(--primary);
+    scrollbar-color: color-mix(in oklch, var(--foreground) 25%, transparent) transparent;
   }
 }
 
