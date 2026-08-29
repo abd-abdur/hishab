@@ -103,6 +103,17 @@ function SignupPage() {
                   </span>
                 </div>
               ) : null}
+              <p className="text-xs text-muted-foreground">
+                By creating an account you agree to the{" "}
+                <Link to="/terms" className="underline hover:text-foreground">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" className="underline hover:text-foreground">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
               <Button type="submit" className="w-full" disabled={pending}>
                 {pending ? "Creating account…" : "Create account"}
               </Button>

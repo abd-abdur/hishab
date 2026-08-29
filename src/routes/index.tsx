@@ -257,9 +257,17 @@ function LandingPage() {
             <BrandMark size={20} />
             hishab — every dirham, accounted for
           </div>
-          <div className="flex items-center gap-1.5">
-            <CategoryDot color="chart-1" />
-            AED-first · any currency
+          <div className="flex items-center gap-4">
+            <Link to="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link to="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <span className="flex items-center gap-1.5">
+              <CategoryDot color="chart-1" />
+              AED-first · any currency
+            </span>
           </div>
         </div>
       </footer>
