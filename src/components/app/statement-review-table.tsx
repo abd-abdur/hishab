@@ -96,12 +96,12 @@ export function StatementReviewTable({
                   <div className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                     {row.description}
                     {row.duplicate ? (
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
+                      <Badge variant="outline" className="shrink-0 text-[11px]">
                         already exists
                       </Badge>
                     ) : null}
                     {row.confidence < 1 ? (
-                      <Badge variant="outline" className="shrink-0 text-[10px] text-warning">
+                      <Badge variant="outline" className="shrink-0 text-[11px] text-warning">
                         check amount
                       </Badge>
                     ) : null}

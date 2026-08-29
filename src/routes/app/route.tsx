@@ -21,8 +21,14 @@ function AppLayout() {
   const { session } = Route.useRouteContext();
   return (
     <SidebarProvider>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       <AppSidebar user={{ name: session.name, email: session.email }} />
-      <SidebarInset>
+      <SidebarInset id="main">
         <Outlet />
       </SidebarInset>
       <CommandMenu />

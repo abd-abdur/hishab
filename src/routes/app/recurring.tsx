@@ -118,7 +118,7 @@ function RecurringPage() {
                         <td className="px-4 py-2.5 font-medium">
                           {s.merchantDisplay}
                           {s.previousAmountMinor != null ? (
-                            <Badge variant="outline" className="ml-2 text-[10px] text-warning">
+                            <Badge variant="outline" className="ml-2 text-[11px] text-warning">
                               price change
                             </Badge>
                           ) : null}

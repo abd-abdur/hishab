@@ -49,7 +49,7 @@ export function ParseProgressList({
 }) {
   if (files.length === 0) return null;
   return (
-    <ul className="divide-y rounded-lg border bg-card">
+    <ul className="divide-y rounded-lg border bg-card" aria-live="polite">
       {files.map((file) => {
         const TypeIcon = TYPE_ICONS[file.fileType];
         const working =

@@ -40,6 +40,20 @@ export const CashflowCalendar = memo(function CashflowCalendar({
 
   return (
     <div>
+      <div className="mb-2 flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+        Less
+        {[0.15, 0.35, 0.6, 0.9].map((intensity) => (
+          <span
+            key={intensity}
+            className="size-3 rounded-sm border"
+            style={{
+              backgroundColor: `color-mix(in oklch, var(--primary) ${Math.round(intensity * 55)}%, var(--card))`,
+            }}
+            aria-hidden
+          />
+        ))}
+        More · tap a day for details
+      </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
         {WEEKDAYS.map((d) => (
           <div key={d} className="py-1">

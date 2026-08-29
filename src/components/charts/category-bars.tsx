@@ -51,7 +51,7 @@ export const CategoryBars = memo(function CategoryBars({
             </div>
             <div className="relative h-2 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full transition-[width]"
+                className="h-full rounded-full"
                 style={{ width: `${widthPct}%`, backgroundColor: chartColor(row.color) }}
               />
               {row.limitMinor !== undefined && row.limitMinor > 0 ? (

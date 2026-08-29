@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { DraftRow, DraftStatement, IngestProgressEvent } from "@/lib/ingest/draft-schema";
 import type { ParsedPage, ParseResponse } from "@/workers/statement-parser.worker";
@@ -98,10 +98,35 @@ function parseInWorker(
   });
 }
 
+const DRAFTS_KEY = "hishab-review-drafts";
+
+function restoreDrafts(): UploadFileState[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(DRAFTS_KEY);
+    if (!raw) return [];
+    const drafts = JSON.parse(raw) as UploadFileState[];
+    return drafts.filter((f) => f.status === "ready" && f.draft != null);
+  } catch {
+    return [];
+  }
+}
+
 export function useStatementUpload() {
-  const [files, setFiles] = useState<UploadFileState[]>([]);
+  // parsed-but-uncommitted reviews survive sign-out and page reloads
+  const [files, setFiles] = useState<UploadFileState[]>(restoreDrafts);
   const parseSemaphore = useRef(new Semaphore(PARSE_CONCURRENCY));
   const analyzeSemaphore = useRef(new Semaphore(ANALYZE_CONCURRENCY));
+
+  useEffect(() => {
+    try {
+      const ready = files.filter((f) => f.status === "ready" && f.draft != null);
+      if (ready.length > 0) sessionStorage.setItem(DRAFTS_KEY, JSON.stringify(ready));
+      else sessionStorage.removeItem(DRAFTS_KEY);
+    } catch {
+      /* storage unavailable — drafts just aren't persisted */
+    }
+  }, [files]);
 
   const update = useCallback((id: string, patch: Partial<UploadFileState>) => {
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
@@ -210,7 +235,7 @@ export function useStatementUpload() {
 
   // Live mirror of the list length so addFiles never depends on stale state
   // and never does work inside a setState updater (which must stay pure).
-  const fileCountRef = useRef(0);
+  const fileCountRef = useRef(files.length);
 
   const addFiles = useCallback(
     (incoming: File[]): string | null => {

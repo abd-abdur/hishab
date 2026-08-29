@@ -1,14 +1,15 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftRight, Download, Search, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { CategoryPicker } from "@/components/app/category-picker";
+import { DateField } from "@/components/app/date-field";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
-import { TransactionsTable } from "@/components/app/transactions-table";
+import { TransactionsTable, type TransactionRow } from "@/components/app/transactions-table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -107,14 +108,44 @@ function TransactionsPage() {
     [navigate],
   );
 
-  const toggle = useCallback((id: string) => {
+  // shift-click selects the whole range from the last clicked row
+  const anchorRef = useRef<string | null>(null);
+  const toggle = useCallback(
+    (id: string, shiftKey: boolean) => {
+      setSelection((prev) => {
+        const next = new Set(prev);
+        if (shiftKey && anchorRef.current && anchorRef.current !== id) {
+          const ids = rows.map((r) => r.id);
+          const a = ids.indexOf(anchorRef.current);
+          const b = ids.indexOf(id);
+          if (a !== -1 && b !== -1) {
+            const adding = !next.has(id);
+            for (let i = Math.min(a, b); i <= Math.max(a, b); i++) {
+              const rangeId = ids[i] as string;
+              if (adding) next.add(rangeId);
+              else next.delete(rangeId);
+            }
+            anchorRef.current = id;
+            return next;
+          }
+        }
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        anchorRef.current = id;
+        return next;
+      });
+    },
+    [rows],
+  );
+
+  const allVisibleSelected = rows.length > 0 && rows.every((r) => selection.has(r.id));
+  const toggleAll = useCallback(() => {
     setSelection((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+      if (rows.length > 0 && rows.every((r) => prev.has(r.id))) return new Set();
+      return new Set(rows.map((r) => r.id));
     });
-  }, []);
+    anchorRef.current = null;
+  }, [rows]);
 
   const recategorize = useMutation({
     mutationFn: recategorizeFn,
@@ -130,6 +161,53 @@ function TransactionsPage() {
     },
     onError: () => toast.error("Update failed. Try again."),
   });
+
+  // inline single-row edit: apply immediately, offer the merchant rule as a follow-up
+  const inlineRecategorize = useMutation({
+    mutationFn: recategorizeFn,
+    onError: () => {
+      toast.error("Update failed. Try again.");
+      void queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+  const handleCategoryChange = useCallback(
+    (row: TransactionRow, categoryId: string) => {
+      if (categoryId === row.categoryId) return;
+      // optimistic: patch every cached page so the row updates instantly
+      queryClient.setQueriesData<typeof query.data>({ queryKey: ["transactions"] }, (data) =>
+        data
+          ? {
+              ...data,
+              pages: data.pages.map((page) => ({
+                ...page,
+                rows: page.rows.map((r) =>
+                  r.id === row.id ? { ...r, categoryId, categorySource: "user" as const } : r,
+                ),
+              })),
+            }
+          : data,
+      );
+      inlineRecategorize.mutate(
+        { data: { transactionIds: [row.id], categoryId, createRule: false } },
+        {
+          onSuccess: () => {
+            const categoryName = categoriesById.get(categoryId)?.name ?? "category";
+            toast.success(`${row.merchantDisplay} → ${categoryName}`, {
+              action: {
+                label: `Always use for ${row.merchantDisplay}`,
+                onClick: () =>
+                  recategorize.mutate({
+                    data: { transactionIds: [row.id], categoryId, createRule: true },
+                  }),
+              },
+            });
+            void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          },
+        },
+      );
+    },
+    [queryClient, inlineRecategorize, recategorize, categoriesById, query.data],
+  );
 
   const exportCsv = useMutation({
     mutationFn: () => exportTransactionsFn({ data: { ...filters, offset: 0, limit: PAGE_SIZE } }),
@@ -219,19 +297,17 @@ function TransactionsPage() {
               <SelectItem value="credit">Money in</SelectItem>
             </SelectContent>
           </Select>
-          <Input
-            type="date"
+          <DateField
             value={search.from ?? ""}
-            onChange={(e) => setSearch({ from: e.target.value || undefined })}
-            className="w-36"
-            aria-label="From date"
+            onChange={(iso) => setSearch({ from: iso || undefined })}
+            label="From date"
+            placeholder="From dd/mm/yyyy"
           />
-          <Input
-            type="date"
+          <DateField
             value={search.to ?? ""}
-            onChange={(e) => setSearch({ to: e.target.value || undefined })}
-            className="w-36"
-            aria-label="To date"
+            onChange={(iso) => setSearch({ to: iso || undefined })}
+            label="To date"
+            placeholder="To dd/mm/yyyy"
           />
           {hasFilters ? (
             <Button
@@ -299,9 +375,13 @@ function TransactionsPage() {
         ) : (
           <TransactionsTable
             rows={rows}
-            categoriesById={categoriesById}
+            categories={categoryOptions}
             selection={selection}
+            allVisibleSelected={allVisibleSelected}
             onToggle={toggle}
+            onToggleAll={toggleAll}
+            onCategoryChange={handleCategoryChange}
+            totalCount={summary?.total ?? rows.length}
             onEndReached={() => {
               if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
             }}

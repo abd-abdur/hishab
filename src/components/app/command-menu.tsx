@@ -6,6 +6,7 @@ import {
   FileText,
   LayoutDashboard,
   PiggyBank,
+  Search,
   Settings,
   Upload,
 } from "lucide-react";
@@ -30,8 +31,12 @@ const PAGES = [
   { to: "/app/settings", label: "Settings", icon: Settings },
 ] as const;
 
+/** Anything can open the palette by dispatching this event (sidebar Search button). */
+export const OPEN_COMMAND_MENU_EVENT = "hishab:open-command-menu";
+
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,20 +46,47 @@ export function CommandMenu() {
         setOpen((prev) => !prev);
       }
     };
+    const onOpenEvent = () => setOpen(true);
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    window.addEventListener(OPEN_COMMAND_MENU_EVENT, onOpenEvent);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(OPEN_COMMAND_MENU_EVENT, onOpenEvent);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
 
   const go = (to: string) => {
     setOpen(false);
     void navigate({ to });
   };
 
+  const searchTransactions = () => {
+    const q = query.trim();
+    setOpen(false);
+    void navigate({ to: "/app/transactions", search: q ? { q } : {} });
+  };
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Jump to a page or search transactions…" />
+      <CommandInput
+        placeholder="Jump to a page or search transactions…"
+        value={query}
+        onValueChange={setQuery}
+      />
       <CommandList>
         <CommandEmpty>No results.</CommandEmpty>
+        {query.trim() ? (
+          <CommandGroup heading="Transactions">
+            <CommandItem value={`search-${query}`} onSelect={searchTransactions}>
+              <Search className="size-4" />
+              Search transactions for “{query.trim()}”
+            </CommandItem>
+          </CommandGroup>
+        ) : null}
         <CommandGroup heading="Pages">
           {PAGES.map((page) => (
             <CommandItem key={page.to} onSelect={() => go(page.to)}>

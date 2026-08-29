@@ -169,6 +169,7 @@ function DashboardPage() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Where {monthName(data.month)} went</CardTitle>
+            <p className="text-xs text-muted-foreground">Spending net of refunds</p>
           </CardHeader>
           <CardContent>
             {byCategory.length === 0 ? (

@@ -1,7 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useRef } from "react";
 
-import { CategoryDot } from "@/components/app/category-icon";
+import { CategoryPicker, type CategoryOption } from "@/components/app/category-picker";
 import { Money } from "@/components/app/money";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,50 +22,63 @@ export type TransactionRow = {
   isAnomaly: boolean;
 };
 
-type CategoryMeta = { name: string; color: string };
-
-const ROW_HEIGHT = 44;
+const ROW_HEIGHT = 48;
 
 const Row = memo(function Row({
   row,
-  category,
+  categories,
   selected,
   onToggle,
+  onCategoryChange,
 }: {
   row: TransactionRow;
-  category: CategoryMeta | undefined;
+  categories: CategoryOption[];
   selected: boolean;
   onToggle: (id: string, shiftKey: boolean) => void;
+  onCategoryChange: (row: TransactionRow, categoryId: string) => void;
 }) {
   return (
     <div
-      className={cn("flex h-11 items-center gap-3 border-b px-3 text-sm", selected && "bg-accent")}
+      role="row"
+      aria-selected={selected}
+      className={cn("flex h-12 items-center gap-3 border-b px-3 text-sm", selected && "bg-accent")}
     >
-      <Checkbox
-        checked={selected}
-        onClick={(e) => onToggle(row.id, (e.nativeEvent as MouseEvent).shiftKey)}
-        aria-label={`Select ${row.merchantDisplay}`}
-      />
-      <span className="num w-20 shrink-0 text-xs text-muted-foreground">
+      <span role="gridcell" className="flex shrink-0">
+        <Checkbox
+          checked={selected}
+          onClick={(e) => onToggle(row.id, (e.nativeEvent as MouseEvent).shiftKey)}
+          aria-label={`Select ${row.merchantDisplay}`}
+        />
+      </span>
+      <span
+        role="gridcell"
+        className="num hidden w-20 shrink-0 text-xs text-muted-foreground sm:block"
+      >
         {formatDate(row.txnDate)}
       </span>
-      <span className="min-w-0 flex-1 truncate" title={row.description}>
-        <span className="font-medium">{row.merchantDisplay}</span>
-        {row.isAnomaly ? (
-          <Badge variant="outline" className="ml-2 text-[10px] text-warning">
-            unusual
-          </Badge>
-        ) : null}
+      <span role="gridcell" className="min-w-0 flex-1" title={row.description}>
+        <span className="block truncate font-medium">
+          {row.merchantDisplay}
+          {row.isAnomaly ? (
+            <Badge variant="outline" className="ml-2 align-middle text-[11px] text-warning">
+              unusual
+            </Badge>
+          ) : null}
+        </span>
+        <span className="num block truncate text-xs text-muted-foreground sm:hidden">
+          {formatDate(row.txnDate)}
+        </span>
       </span>
-      <span className="hidden w-36 shrink-0 items-center gap-1.5 truncate text-xs text-muted-foreground sm:flex">
-        {category ? (
-          <>
-            <CategoryDot color={category.color} />
-            {category.name}
-          </>
-        ) : null}
+      {/* inline category editing — the row is the unit of correction */}
+      <span role="gridcell" className="hidden w-44 shrink-0 md:block">
+        <CategoryPicker
+          categories={categories}
+          value={row.categoryId}
+          onChange={(categoryId) => onCategoryChange(row, categoryId)}
+          size="sm"
+        />
       </span>
-      <span className="w-32 shrink-0 text-right">
+      <span role="gridcell" className="w-28 shrink-0 text-right sm:w-32">
         <Money
           value={row.amountMinor}
           currency={row.currency}
@@ -79,16 +92,24 @@ const Row = memo(function Row({
 
 export function TransactionsTable({
   rows,
-  categoriesById,
+  categories,
   selection,
+  allVisibleSelected,
   onToggle,
+  onToggleAll,
+  onCategoryChange,
   onEndReached,
+  totalCount,
 }: {
   rows: TransactionRow[];
-  categoriesById: Map<string, CategoryMeta>;
+  categories: CategoryOption[];
   selection: Set<string>;
+  allVisibleSelected: boolean;
   onToggle: (id: string, shiftKey: boolean) => void;
+  onToggleAll: () => void;
+  onCategoryChange: (row: TransactionRow, categoryId: string) => void;
   onEndReached: () => void;
+  totalCount: number;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -99,40 +120,67 @@ export function TransactionsTable({
   });
 
   return (
-    <div
-      ref={parentRef}
-      className="h-[calc(100vh-260px)] overflow-auto rounded-lg border bg-card"
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < ROW_HEIGHT * 20) {
-          onEndReached();
-        }
-      }}
-    >
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const row = rows[virtualRow.index];
-          if (!row) return null;
-          return (
-            <div
-              key={row.id}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              <Row
-                row={row}
-                category={categoriesById.get(row.categoryId)}
-                selected={selection.has(row.id)}
-                onToggle={onToggle}
-              />
-            </div>
-          );
-        })}
+    <div role="grid" aria-rowcount={totalCount + 1} className="rounded-lg border bg-card">
+      <div
+        role="row"
+        className="flex items-center gap-3 border-b bg-muted px-3 py-2 text-xs font-medium text-muted-foreground"
+      >
+        <span role="columnheader" className="flex shrink-0">
+          <Checkbox
+            checked={allVisibleSelected}
+            onClick={onToggleAll}
+            aria-label="Select all loaded transactions"
+          />
+        </span>
+        <span role="columnheader" className="hidden w-20 shrink-0 sm:block">
+          Date
+        </span>
+        <span role="columnheader" className="min-w-0 flex-1">
+          Merchant
+        </span>
+        <span role="columnheader" className="hidden w-44 shrink-0 md:block">
+          Category
+        </span>
+        <span role="columnheader" className="w-28 shrink-0 text-right sm:w-32">
+          Amount
+        </span>
+      </div>
+      <div
+        ref={parentRef}
+        className="h-[calc(100vh-300px)] overflow-auto pb-1"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < ROW_HEIGHT * 20) {
+            onEndReached();
+          }
+        }}
+      >
+        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const row = rows[virtualRow.index];
+            if (!row) return null;
+            return (
+              <div
+                key={row.id}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <Row
+                  row={row}
+                  categories={categories}
+                  selected={selection.has(row.id)}
+                  onToggle={onToggle}
+                  onCategoryChange={onCategoryChange}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -22,9 +22,9 @@ function createAuth() {
       enabled: true,
     },
     session: {
-      // sessions expire after 10 minutes without activity; any authenticated
+      // sessions expire after 30 minutes without activity; any authenticated
       // request inside that window extends them
-      expiresIn: 60 * 10,
+      expiresIn: 60 * 30,
       updateAge: 60,
     },
     ...(googleClientId && googleClientSecret

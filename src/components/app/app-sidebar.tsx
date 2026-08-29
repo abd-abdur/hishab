@@ -8,8 +8,11 @@ import {
   LayoutDashboard,
   LogOut,
   PiggyBank,
+  Search as SearchIcon,
   Settings,
 } from "lucide-react";
+
+import { OPEN_COMMAND_MENU_EVENT } from "@/components/app/command-menu";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -69,6 +72,20 @@ export function AppSidebar({ user }: { user: { name: string; email: string } }) 
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Search (⌘K)"
+                  onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_MENU_EVENT))}
+                >
+                  <SearchIcon />
+                  <span className="flex flex-1 items-center justify-between">
+                    Search
+                    <kbd className="rounded border bg-muted px-1.5 font-sans text-[11px] text-muted-foreground">
+                      ⌘K
+                    </kbd>
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {NAV.map((item) => {
                 const active =
                   "exact" in item && item.exact
@@ -108,7 +125,7 @@ export function AppSidebar({ user }: { user: { name: string; email: string } }) 
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton tooltip={user.name}>
                   <Avatar className="size-5">
-                    <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+                    <AvatarFallback className="text-[11px]">{initials}</AvatarFallback>
                   </Avatar>
                   <span className="truncate">{user.name}</span>
                 </SidebarMenuButton>

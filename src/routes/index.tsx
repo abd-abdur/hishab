@@ -68,7 +68,7 @@ function DashboardPreview() {
               <span className="flex items-center gap-2">
                 {item.merchant}
                 {item.priceChange ? (
-                  <Badge variant="outline" className="text-[10px] text-warning">
+                  <Badge variant="outline" className="text-[11px] text-warning">
                     price change
                   </Badge>
                 ) : null}
