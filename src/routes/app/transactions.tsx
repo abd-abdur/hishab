@@ -234,11 +234,7 @@ function TransactionsPage() {
         title="Transactions"
         description={
           summary
-            ? `${summary.total} transactions · Spent −${formatMoney(summary.spendMinor, summary.currency)} · Income +${formatMoney(summary.incomeMinor, summary.currency)}${
-                summary.transferOutMinor > 0 || summary.transferInMinor > 0
-                  ? ` · Own transfers −${formatMoney(summary.transferOutMinor, summary.currency)} / +${formatMoney(summary.transferInMinor, summary.currency)}`
-                  : ""
-              }`
+            ? `${summary.total} transaction${summary.total === 1 ? "" : "s"}${hasFilters ? " matching your filters" : ""}`
             : undefined
         }
         actions={
@@ -254,6 +250,41 @@ function TransactionsPage() {
         }
       />
       <div className="space-y-3 p-4 md:p-6">
+        {summary && summary.total > 0 ? (
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4">
+            <div className="bg-card px-4 py-3">
+              <dt className="text-xs text-muted-foreground">Spent</dt>
+              <dd className="num mt-0.5 font-medium text-negative">
+                −{formatMoney(summary.spendMinor, summary.currency)}
+              </dd>
+            </div>
+            <div className="bg-card px-4 py-3">
+              <dt className="text-xs text-muted-foreground">Income</dt>
+              <dd className="num mt-0.5 font-medium text-positive">
+                +{formatMoney(summary.incomeMinor, summary.currency)}
+              </dd>
+            </div>
+            <div className="bg-card px-4 py-3">
+              <dt className="text-xs text-muted-foreground">Net</dt>
+              <dd
+                className={`num mt-0.5 font-medium ${
+                  summary.incomeMinor - summary.spendMinor < 0 ? "text-negative" : "text-positive"
+                }`}
+              >
+                {summary.incomeMinor - summary.spendMinor < 0 ? "−" : "+"}
+                {formatMoney(Math.abs(summary.incomeMinor - summary.spendMinor), summary.currency)}
+              </dd>
+            </div>
+            <div className="bg-card px-4 py-3">
+              <dt className="text-xs text-muted-foreground">Between my accounts</dt>
+              <dd className="num mt-0.5 font-medium text-muted-foreground">
+                {summary.transferOutMinor > 0 || summary.transferInMinor > 0
+                  ? `−${formatMoney(summary.transferOutMinor, summary.currency)} · +${formatMoney(summary.transferInMinor, summary.currency)}`
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <form
             className="relative"
