@@ -19,6 +19,9 @@ export const DraftRowSchema = z.object({
   dedupHash: z.string().length(64),
   /** true when an identical transaction already exists in the account */
   duplicate: z.boolean(),
+  /** true when a row with the same date/amount/direction exists under a
+   *  different name — possible fee invoice or overlapping document */
+  similar: z.boolean().default(false),
 });
 
 export const DraftStatementSchema = z.object({

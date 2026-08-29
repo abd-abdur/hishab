@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth.server";
 import { categorizeTransactions } from "@/lib/ingest/categorize.server";
 import type { DraftRow, IngestProgressEvent } from "@/lib/ingest/draft-schema";
 import { extractStatement, type IngestPage } from "@/lib/ingest/extract.server";
-import { findExistingHashes } from "@/lib/ingest/persist.server";
+import { findExistingHashes, findSimilarRowKeys } from "@/lib/ingest/persist.server";
 import { redactAccountIdentifiers } from "@/lib/ingest/redact";
 import { dedupHashes, verifyStatement } from "@/lib/ingest/verify";
 
@@ -147,7 +147,10 @@ export const Route = createFileRoute("/api/ingest")({
 
               send({ stage: "checking_duplicates" });
               const hashes = await dedupHashes(userId, categorized);
-              const existing = await findExistingHashes(userId, hashes);
+              const [existing, similarKeys] = await Promise.all([
+                findExistingHashes(userId, hashes),
+                findSimilarRowKeys(userId, categorized),
+              ]);
 
               const rows: DraftRow[] = categorized.map((t, i) => ({
                 txnDate: t.txnDate,
@@ -162,6 +165,9 @@ export const Route = createFileRoute("/api/ingest")({
                 categorySource: t.categorySource,
                 dedupHash: hashes[i] as string,
                 duplicate: existing.has(hashes[i] as string),
+                similar:
+                  !existing.has(hashes[i] as string) &&
+                  similarKeys.has(`${t.txnDate}|${t.amountMinor}|${t.direction}`),
               }));
 
               send({
@@ -186,7 +192,8 @@ export const Route = createFileRoute("/api/ingest")({
             } catch (error) {
               // Log the shape of the failure, never the payload — model errors
               // can echo statement text back in their response bodies.
-              const message = error instanceof Error ? `${error.name}: ${error.message}` : "unknown";
+              const message =
+                error instanceof Error ? `${error.name}: ${error.message}` : "unknown";
               console.error(`ingest failed — ${message.slice(0, 300)}`);
               send({
                 stage: "error",

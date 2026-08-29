@@ -23,6 +23,7 @@ export function StatementReviewTable({
   onRowsChange: (rows: DraftRow[]) => void;
 }) {
   const duplicates = rows.filter((r) => r.duplicate).length;
+  const similars = rows.filter((r) => !r.duplicate && r.similar).length;
   const transferIds = useMemo(
     () => new Set(categories.filter((c) => c.kind === "transfer").map((c) => c.id)),
     [categories],
@@ -77,6 +78,12 @@ export function StatementReviewTable({
             {duplicates} row{duplicates === 1 ? "" : "s"} already in your account will be skipped
           </span>
         ) : null}
+        {similars > 3 ? (
+          <span className="text-warning">
+            {similars} rows match existing transactions by date and amount under a different name —
+            if this file is a fee breakdown or overlaps another statement, consider not adding it
+          </span>
+        ) : null}
       </div>
 
       <div className="max-h-[52vh] overflow-auto rounded-lg border">
@@ -107,6 +114,11 @@ export function StatementReviewTable({
                     {row.confidence < 1 ? (
                       <Badge variant="outline" className="shrink-0 text-[11px] text-warning">
                         check amount
+                      </Badge>
+                    ) : null}
+                    {!row.duplicate && row.similar ? (
+                      <Badge variant="outline" className="shrink-0 text-[11px] text-warning">
+                        matches an existing amount
                       </Badge>
                     ) : null}
                   </div>
