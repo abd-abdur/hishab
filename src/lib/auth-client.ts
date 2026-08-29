@@ -1,8 +1,11 @@
+import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-export const authClient = createAuthClient();
+export const authClient = createAuthClient({
+  plugins: [twoFactorClient()],
+});
 
-export const { signIn, signUp, signOut, useSession } = authClient;
+export const { signIn, signUp, signOut, useSession, twoFactor } = authClient;
 
 /** Codes returned by the auth API, mapped to messages a person can act on. */
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -14,14 +17,21 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   USER_NOT_FOUND: "Wrong email or password.",
   USER_EMAIL_NOT_FOUND: "Wrong email or password.",
   CREDENTIAL_ACCOUNT_NOT_FOUND: "Wrong email or password.",
-  PASSWORD_TOO_SHORT: "Password must be at least 8 characters.",
+  PASSWORD_TOO_SHORT: "Password must be at least 12 characters.",
   PASSWORD_TOO_LONG: "That password is too long — 128 characters is the maximum.",
-  EMAIL_NOT_VERIFIED: "This email hasn't been verified yet.",
+  EMAIL_NOT_VERIFIED: "Check your inbox — you need to verify this email before signing in.",
+  INVALID_TWO_FACTOR_AUTHENTICATION: "That code didn't match. Try the current code from your app.",
+  INVALID_CODE: "That code didn't match. Try the current code from your app.",
+  TOO_MANY_REQUESTS: "Too many attempts. Wait a minute, then try again.",
   SESSION_EXPIRED: "Your session expired — please sign in again.",
   VALIDATION_ERROR: "Please check the details you entered and try again.",
 };
 
-export type AuthError = { code?: string | undefined; message?: string | undefined };
+export type AuthError = {
+  code?: string | undefined;
+  message?: string | undefined;
+  status?: number | undefined;
+};
 
 /** True when the error means the email is already registered. */
 export function isExistingAccountError(error: AuthError | null | undefined): boolean {
@@ -33,6 +43,14 @@ export function isExistingAccountError(error: AuthError | null | undefined): boo
 export function authErrorMessage(error: AuthError | null | undefined, fallback: string): string {
   if (error?.code && AUTH_ERROR_MESSAGES[error.code]) {
     return AUTH_ERROR_MESSAGES[error.code] as string;
+  }
+  // Rate-limit responses arrive as plain text without a code, so the status
+  // is the only reliable signal.
+  if (error?.status === 429) {
+    return "Too many attempts. Wait a minute, then try again.";
+  }
+  if (error?.status !== undefined && error.status >= 500) {
+    return "Something went wrong on our side. Try again in a moment.";
   }
   return error?.message ?? fallback;
 }

@@ -1,12 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { db } from "@/db/client";
+import { ingestEvents } from "@/db/schema";
 import { auth } from "@/lib/auth.server";
 import { categorizeTransactions } from "@/lib/ingest/categorize.server";
 import type { DraftRow, IngestProgressEvent } from "@/lib/ingest/draft-schema";
 import { extractStatement, type IngestPage } from "@/lib/ingest/extract.server";
 import { findExistingHashes } from "@/lib/ingest/persist.server";
+import { redactAccountIdentifiers } from "@/lib/ingest/redact";
 import { dedupHashes, verifyStatement } from "@/lib/ingest/verify";
+
+/** Uploads per user per hour. Each upload fans out multiple model calls. */
+const INGEST_HOURLY_LIMIT = 30;
+/** Hard cap on the request body; zod caps per-page sizes below. */
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
 
 const PageSchema = z.union([
   z.object({
@@ -40,6 +49,21 @@ export const Route = createFileRoute("/api/ingest")({
         if (!session) return new Response("Unauthorized", { status: 401 });
         const userId = session.user.id;
 
+        const contentLength = Number(request.headers.get("content-length") ?? 0);
+        if (contentLength > MAX_BODY_BYTES) {
+          return new Response("File too large", { status: 413 });
+        }
+
+        // Per-user quota: ingestion is the cost center and the abuse surface.
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const [recent] = await db
+          .select({ n: count() })
+          .from(ingestEvents)
+          .where(and(eq(ingestEvents.userId, userId), gte(ingestEvents.createdAt, hourAgo)));
+        if ((recent?.n ?? 0) >= INGEST_HOURLY_LIMIT) {
+          return new Response("Upload limit reached — try again in an hour.", { status: 429 });
+        }
+
         let body: unknown;
         try {
           body = await request.json();
@@ -50,7 +74,25 @@ export const Route = createFileRoute("/api/ingest")({
         if (!parsed.success) {
           return new Response("Invalid request", { status: 400 });
         }
-        const { fileName, fileType, pages } = parsed.data;
+        const { fileName, fileType, pages: rawPages } = parsed.data;
+
+        // Mask account numbers, IBANs, and card numbers before any text
+        // reaches the extraction model. Image pages pass through as-is —
+        // pixels can't be redacted here, which the privacy docs disclose.
+        const pages = rawPages.map((p) =>
+          p.kind === "text" ? { ...p, text: redactAccountIdentifiers(p.text) } : p,
+        );
+
+        await db.insert(ingestEvents).values({
+          id: crypto.randomUUID(),
+          userId,
+          pageCount: pages.length,
+        });
+        // Opportunistic prune so the quota table never needs a cron.
+        void db
+          .delete(ingestEvents)
+          .where(lt(ingestEvents.createdAt, sql`now() - interval '24 hours'`))
+          .catch(() => {});
 
         const encoder = new TextEncoder();
         const stream = new ReadableStream<Uint8Array>({
@@ -142,7 +184,10 @@ export const Route = createFileRoute("/api/ingest")({
                 },
               });
             } catch (error) {
-              console.error("ingest failed", error);
+              // Log the shape of the failure, never the payload — model errors
+              // can echo statement text back in their response bodies.
+              const message = error instanceof Error ? `${error.name}: ${error.message}` : "unknown";
+              console.error(`ingest failed — ${message.slice(0, 300)}`);
               send({
                 stage: "error",
                 message: "The analysis engine couldn't process this file. Please try again.",

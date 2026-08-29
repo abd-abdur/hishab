@@ -21,6 +21,7 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -64,6 +65,26 @@ export const verification = pgTable("verification", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const twoFactor = pgTable("two_factor", {
+  id: text("id").primaryKey(),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").notNull(),
+  verified: boolean("verified").notNull().default(false),
+  failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
+/** better-auth rate-limit counters. Database-backed so limits hold across serverless instances. */
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -225,6 +246,24 @@ export const recurringSeries = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("recurring_user_merchant_idx").on(t.userId, t.merchantNorm, t.cadence)],
+);
+
+/**
+ * One row per /api/ingest call, for per-user quota enforcement. Ingestion fans
+ * out multiple model calls per upload, so it is both the cost center and the
+ * abuse surface; rows older than the quota window are pruned opportunistically.
+ */
+export const ingestEvents = pgTable(
+  "ingest_events",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    pageCount: integer("page_count").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("ingest_events_user_time_idx").on(t.userId, t.createdAt)],
 );
 
 /** Cached natural-language insights, generated from computed aggregates only. */

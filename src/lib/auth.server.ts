@@ -1,14 +1,24 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { twoFactor } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 
 import { db } from "@/db/client";
 import * as schema from "@/db/schema";
+import {
+  isEmailConfigured,
+  resetPasswordEmail,
+  sendEmail,
+  verificationEmail,
+} from "@/lib/email.server";
 
 function createAuth() {
   const googleClientId = process.env["GOOGLE_CLIENT_ID"];
   const googleClientSecret = process.env["GOOGLE_CLIENT_SECRET"];
+  const baseUrl = process.env["BETTER_AUTH_URL"];
+  const vercelUrl = process.env["VERCEL_URL"];
   return betterAuth({
+    appName: "Hishab",
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
@@ -16,10 +26,42 @@ function createAuth() {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        twoFactor: schema.twoFactor,
+        rateLimit: schema.rateLimit,
       },
     }),
+    trustedOrigins: [...(baseUrl ? [baseUrl] : []), ...(vercelUrl ? [`https://${vercelUrl}`] : [])],
     emailAndPassword: {
       enabled: true,
+      // The password will eventually protect the client-side encryption key,
+      // so it matters twice.
+      minPasswordLength: 12,
+      // Only enforced when we can actually deliver the verification mail;
+      // local dev without RESEND_API_KEY stays sign-up-and-go.
+      requireEmailVerification: isEmailConfigured(),
+      resetPasswordTokenExpiresIn: 60 * 60,
+      sendResetPassword: async ({ user, url }) => {
+        const mail = resetPasswordEmail(user.name, url);
+        await sendEmail({ to: user.email, ...mail });
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, url }) => {
+        const mail = verificationEmail(user.name, url);
+        await sendEmail({ to: user.email, ...mail });
+      },
+    },
+    rateLimit: {
+      // Database-backed so limits hold across serverless instances. better-auth
+      // applies stricter built-in rules to sensitive paths (sign-in, sign-up)
+      // on top of this window.
+      enabled: true,
+      storage: "database",
+      modelName: "rateLimit",
+      window: 60,
+      max: 60,
     },
     session: {
       // sessions expire after 30 minutes without activity; any authenticated
@@ -34,7 +76,7 @@ function createAuth() {
           },
         }
       : {}),
-    plugins: [tanstackStartCookies()],
+    plugins: [twoFactor(), tanstackStartCookies()],
   });
 }
 

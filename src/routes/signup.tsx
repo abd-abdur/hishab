@@ -24,8 +24,8 @@ function SignupPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const password = String(form.get("password"));
-    if (password.length < 8) {
-      setFormError({ message: "Password must be at least 8 characters.", existingAccount: false });
+    if (password.length < 12) {
+      setFormError({ message: "Password must be at least 12 characters.", existingAccount: false });
       return;
     }
     setFormError(null);
@@ -78,9 +78,10 @@ function SignupPage() {
                   name="password"
                   type="password"
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={12}
                   required
                 />
+                <p className="text-xs text-muted-foreground">At least 12 characters.</p>
               </div>
               {formError ? (
                 <div

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Moon, Plus, Sun, Trash2 } from "lucide-react";
+import { Moon, Plus, ShieldCheck, Sun, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { getRulesFn } from "@/lib/app-data.functions";
 import { createCategoryFn, deleteRuleFn } from "@/lib/app-mutations.functions";
+import { authErrorMessage, twoFactor, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/app/settings")({
   component: SettingsPage,
@@ -73,6 +74,8 @@ function SettingsPage() {
             <div className="text-muted-foreground">{session.email}</div>
           </CardContent>
         </Card>
+
+        <TwoFactorCard />
 
         <Card>
           <CardHeader>
@@ -155,5 +158,143 @@ function SettingsPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+/**
+ * TOTP two-factor auth. Enable shows the authenticator secret and one-time
+ * backup codes; a first valid code confirms and switches it on.
+ */
+function TwoFactorCard() {
+  const { data: sessionData, refetch } = useSession();
+  const enabled = Boolean(
+    sessionData?.user && "twoFactorEnabled" in sessionData.user && sessionData.user.twoFactorEnabled,
+  );
+
+  const [password, setPassword] = useState("");
+  const [pending, setPending] = useState(false);
+  const [setup, setSetup] = useState<{ totpURI: string; backupCodes: string[] } | null>(null);
+  const [code, setCode] = useState("");
+
+  const totpSecret = setup ? (/[?&]secret=([^&]+)/.exec(setup.totpURI)?.[1] ?? "") : "";
+
+  async function startEnable(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    const { data, error } = await twoFactor.enable({ password });
+    setPending(false);
+    if (error || !data || !("totpURI" in data)) {
+      toast.error(authErrorMessage(error, "Couldn't start two-factor setup."));
+      return;
+    }
+    setPassword("");
+    setSetup({ totpURI: data.totpURI, backupCodes: data.backupCodes });
+  }
+
+  async function confirmEnable(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    const { error } = await twoFactor.verifyTotp({ code: code.replace(/\s+/g, "") });
+    setPending(false);
+    if (error) {
+      toast.error(authErrorMessage(error, "That code didn't match. Try the current one."));
+      return;
+    }
+    setSetup(null);
+    setCode("");
+    toast.success("Two-factor authentication is on");
+    void refetch();
+  }
+
+  async function disable(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    const { error } = await twoFactor.disable({ password });
+    setPending(false);
+    if (error) {
+      toast.error(authErrorMessage(error, "Couldn't turn off two-factor authentication."));
+      return;
+    }
+    setPassword("");
+    toast.success("Two-factor authentication is off");
+    void refetch();
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="size-4" aria-hidden />
+          Two-factor authentication
+        </CardTitle>
+        <CardDescription>
+          {enabled
+            ? "On — signing in asks for a code from your authenticator app."
+            : "Add a second step at sign-in using an authenticator app (Google Authenticator, 1Password, etc.)."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {setup ? (
+          <form onSubmit={confirmEnable} className="space-y-3 text-sm">
+            <p>
+              Add this key to your authenticator app, then enter the 6-digit code it shows to
+              finish:
+            </p>
+            <div className="rounded-md border bg-muted/40 p-3">
+              <div className="font-mono text-sm break-all select-all">{totpSecret}</div>
+              <a
+                href={setup.totpURI}
+                className="mt-1 inline-block text-xs text-primary hover:underline"
+              >
+                Open in authenticator app
+              </a>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium">Backup codes</p>
+              <p className="text-muted-foreground">
+                Save these somewhere safe — each one signs you in once if you lose your
+                authenticator.
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 rounded-md border bg-muted/40 p-3 font-mono text-xs select-all">
+                {setup.backupCodes.map((backupCode) => (
+                  <span key={backupCode}>{backupCode}</span>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6-digit code"
+                required
+              />
+              <Button type="submit" disabled={pending || code.trim().length < 6}>
+                {pending ? "Verifying…" : "Turn on"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={enabled ? disable : startEnable} className="flex gap-2">
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder="Confirm your password"
+              required
+            />
+            <Button
+              type="submit"
+              variant={enabled ? "outline" : "default"}
+              disabled={pending || password.length === 0}
+            >
+              {pending ? "Working…" : enabled ? "Turn off" : "Turn on"}
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }

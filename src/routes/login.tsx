@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authErrorMessage, signIn } from "@/lib/auth-client";
+import { authErrorMessage, signIn, twoFactor } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -17,19 +17,42 @@ function LoginPage() {
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [needsTotp, setNeedsTotp] = useState(false);
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setFormError(null);
     setPending(true);
-    const { error } = await signIn.email({
+    const { data, error } = await signIn.email({
       email: String(form.get("email")),
       password: String(form.get("password")),
     });
     setPending(false);
     if (error) {
       setFormError(authErrorMessage(error, "Sign in failed. Check your email and password."));
+      return;
+    }
+    if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+      setNeedsTotp(true);
+      return;
+    }
+    void navigate({ to: "/app" });
+  }
+
+  async function handleTotpSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const code = String(form.get("code")).replace(/\s+/g, "");
+    setFormError(null);
+    setPending(true);
+    const { error } = useBackupCode
+      ? await twoFactor.verifyBackupCode({ code })
+      : await twoFactor.verifyTotp({ code });
+    setPending(false);
+    if (error) {
+      setFormError(authErrorMessage(error, "That code didn't match. Try again."));
       return;
     }
     void navigate({ to: "/app" });
@@ -44,48 +67,98 @@ function LoginPage() {
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Sign in to your account</CardDescription>
+            <CardTitle>{needsTotp ? "Two-factor code" : "Welcome back"}</CardTitle>
+            <CardDescription>
+              {needsTotp
+                ? useBackupCode
+                  ? "Enter one of your backup codes"
+                  : "Enter the 6-digit code from your authenticator app"
+                : "Sign in to your account"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* method="post" keeps credentials out of the URL if a submit lands before hydration */}
-            <form method="post" onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" autoComplete="email" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-              {formError ? (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-md border border-negative/30 bg-negative/5 px-3 py-2 text-sm text-negative"
-                >
-                  <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span>{formError}</span>
+            {needsTotp ? (
+              <form method="post" onSubmit={handleTotpSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="code">{useBackupCode ? "Backup code" : "Code"}</Label>
+                  <Input
+                    id="code"
+                    name="code"
+                    inputMode={useBackupCode ? "text" : "numeric"}
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                  />
                 </div>
-              ) : null}
-              <Button type="submit" className="w-full" disabled={pending}>
-                {pending ? "Signing in…" : "Sign in"}
-              </Button>
-            </form>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              No account yet?{" "}
-              <Link to="/signup" className="font-medium text-primary hover:underline">
-                Create one
-              </Link>
-            </p>
+                {formError ? <FormError message={formError} /> : null}
+                <Button type="submit" className="w-full" disabled={pending}>
+                  {pending ? "Verifying…" : "Verify"}
+                </Button>
+                <button
+                  type="button"
+                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setUseBackupCode((v) => !v);
+                    setFormError(null);
+                  }}
+                >
+                  {useBackupCode ? "Use authenticator code instead" : "Use a backup code instead"}
+                </button>
+              </form>
+            ) : (
+              /* method="post" keeps credentials out of the URL if a submit lands before hydration */
+              <form method="post" onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" name="email" type="email" autoComplete="email" required />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link
+                      to="/forgot-password"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+                {formError ? <FormError message={formError} /> : null}
+                <Button type="submit" className="w-full" disabled={pending}>
+                  {pending ? "Signing in…" : "Sign in"}
+                </Button>
+              </form>
+            )}
+            {!needsTotp ? (
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                No account yet?{" "}
+                <Link to="/signup" className="font-medium text-primary hover:underline">
+                  Create one
+                </Link>
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
     </main>
+  );
+}
+
+function FormError({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-md border border-negative/30 bg-negative/5 px-3 py-2 text-sm text-negative"
+    >
+      <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{message}</span>
+    </div>
   );
 }

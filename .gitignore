@@ -42,3 +42,4 @@ drizzle/meta/_journal.json.bak
 *.sln
 *.sw?
 .neon
+.env*
