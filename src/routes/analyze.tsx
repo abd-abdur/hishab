@@ -19,7 +19,8 @@ import { SiteFooter, SiteNav } from "@/components/site-nav";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { analyzeStatement, type SpendingAnalysis } from "@/lib/analyze.functions";
+import { analyzeStatement } from "@/lib/analyze.functions";
+import { type SpendingAnalysis } from "@/lib/analysis-schema";
 import { extractPdfText } from "@/lib/pdf-text";
 
 export const Route = createFileRoute("/analyze")({
