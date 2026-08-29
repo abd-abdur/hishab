@@ -1,7 +1,9 @@
 import "@fontsource-variable/fraunces";
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, CalendarClock, CheckCircle2, FileUp, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, SlidersHorizontal } from "lucide-react";
+
+import { useSession } from "@/lib/auth-client";
 
 import { CategoryDot } from "@/components/app/category-icon";
 import { CategoryBars } from "@/components/charts/category-bars";
@@ -120,17 +122,31 @@ const FAQS = [
 ];
 
 function LandingPage() {
+  const { data: session } = useSession();
+  const signedIn = Boolean(session?.user);
+
   return (
     <main className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Wordmark />
         <nav className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/login">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link to="/signup">Start free</Link>
-          </Button>
+          {signedIn ? (
+            <Button asChild size="sm">
+              <Link to="/app">
+                Open your dashboard
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/login">Sign in</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/signup">Start free</Link>
+              </Button>
+            </>
+          )}
         </nav>
       </header>
 
@@ -142,18 +158,29 @@ function LandingPage() {
           </h1>
           <p className="mt-4 max-w-md text-lg text-muted-foreground">
             Upload a bank statement — PDF, a photo of a page, CSV or Excel. Hishab turns it into
-            searchable transactions, budgets and trends. Built for AED.
+            searchable transactions, budgets and trends. AED-first, fluent in any currency.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link to="/signup">
-                Start free
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/login">Sign in</Link>
-            </Button>
+            {signedIn ? (
+              <Button asChild size="lg">
+                <Link to="/app">
+                  Open your dashboard
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild size="lg">
+                  <Link to="/signup">
+                    Start free
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <Link to="/login">Sign in</Link>
+                </Button>
+              </>
+            )}
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
             No bank logins. Every row reviewed by you before it counts.
@@ -224,7 +251,7 @@ function LandingPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <CategoryDot color="chart-1" />
-            Built for AED
+            AED-first · any currency
           </div>
         </div>
       </footer>

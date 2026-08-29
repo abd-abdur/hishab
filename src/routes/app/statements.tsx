@@ -47,6 +47,7 @@ function StatementsPage() {
   const { data: statements, isPending } = useQuery({
     queryKey: ["statements"],
     queryFn: () => getStatementsFn(),
+    staleTime: 30_000,
   });
   const { data: categories } = useQuery({
     queryKey: ["categories"],

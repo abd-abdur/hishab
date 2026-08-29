@@ -23,6 +23,7 @@ function RecurringPage() {
   const { data: series, isPending } = useQuery({
     queryKey: ["recurring"],
     queryFn: () => getRecurringFn(),
+    staleTime: 60_000,
   });
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -66,7 +67,7 @@ function RecurringPage() {
                 <CardContent className="pt-5">
                   <div className="text-sm text-muted-foreground">Committed spend per month</div>
                   <div className="num mt-1 text-2xl font-semibold">
-                    {formatMoney(committedMonthly)}
+                    {formatMoney(committedMonthly, series?.[0]?.currency ?? "AED")}
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
                     {(series ?? []).length} recurring charge{(series ?? []).length === 1 ? "" : "s"}

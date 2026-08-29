@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { budgets, categories, categoryRules, transactions } from "@/db/schema";
+import { getFreshness } from "@/lib/analytics/aggregates.server";
 import { CHART_SLOTS, nextChartSlot } from "@/lib/categories";
 import { authMiddleware } from "@/lib/auth-middleware";
 
@@ -110,6 +111,7 @@ export const upsertBudgetFn = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context }) => {
+    const { primaryCurrency } = await getFreshness(context.userId);
     await db
       .insert(budgets)
       .values({
@@ -117,7 +119,7 @@ export const upsertBudgetFn = createServerFn({ method: "POST" })
         userId: context.userId,
         categoryId: data.categoryId,
         monthlyLimitMinor: data.monthlyLimitMinor,
-        currency: "AED",
+        currency: primaryCurrency,
       })
       .onConflictDoUpdate({
         target: [budgets.userId, budgets.categoryId],

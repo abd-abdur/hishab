@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Upload bank statements — PDF, scans, CSV or Excel — and Hishab turns them into searchable transactions, budgets and trends. Built for AED.",
+          "Upload bank statements — PDF, scans, CSV or Excel — and Hishab turns them into searchable transactions, budgets and trends. AED-first, fluent in any currency.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

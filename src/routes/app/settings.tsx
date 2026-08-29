@@ -42,6 +42,7 @@ function SettingsPage() {
   const { data: rules } = useQuery({
     queryKey: ["rules"],
     queryFn: () => getRulesFn(),
+    staleTime: 60_000,
   });
 
   const deleteRule = useMutation({

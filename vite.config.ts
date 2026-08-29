@@ -11,9 +11,10 @@ export default defineConfig({
     tanstackStart(),
     nitro({
       vercel: {
-        // Statement analysis fans out multiple model calls per upload;
-        // give the server functions room beyond the 10s default.
-        functions: { maxDuration: 300 },
+        // maxDuration: statement analysis fans out multiple model calls.
+        // regions: pin the functions next to the Neon database (Singapore) —
+        // the default US region put an ocean between every query.
+        functions: { maxDuration: 300, regions: ["sin1"] },
       },
     }),
     viteReact(),

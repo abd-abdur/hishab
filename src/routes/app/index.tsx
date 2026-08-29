@@ -107,7 +107,7 @@ function DashboardPage() {
         title="Overview"
         description={
           freshness.latestDate
-            ? `Data through ${formatDateLong(freshness.latestDate)} · ${freshness.statementCount} statement${freshness.statementCount === 1 ? "" : "s"}`
+            ? `Data through ${formatDateLong(freshness.latestDate)} · ${freshness.statementCount} statement${freshness.statementCount === 1 ? "" : "s"}${freshness.currencyCount > 1 ? ` · showing ${data.currency}` : ""}`
             : undefined
         }
         actions={
@@ -122,7 +122,7 @@ function DashboardPage() {
       <div className="grid gap-4 p-4 md:grid-cols-3 md:p-6">
         <StatCard
           label={`${monthName(data.month)} spend`}
-          value={formatMoney(pace.spendToDateMinor)}
+          value={formatMoney(pace.spendToDateMinor, data.currency)}
           detail={
             paceDelta !== null ? (
               <span className={paceDelta > 0 ? "text-negative" : "text-positive"}>
@@ -139,9 +139,9 @@ function DashboardPage() {
         </StatCard>
         <StatCard
           label={`Net cashflow in ${monthName(data.month)}`}
-          value={`${netMinor < 0 ? "−" : "+"}${formatMoney(Math.abs(netMinor))}`}
+          value={`${netMinor < 0 ? "−" : "+"}${formatMoney(Math.abs(netMinor), data.currency)}`}
           tone={netMinor < 0 ? "negative" : "positive"}
-          detail={`Income ${formatMoney(thisMonthIncome)}`}
+          detail={`Income ${formatMoney(thisMonthIncome, data.currency)}`}
         />
         <StatCard
           label={data.isCurrentMonth ? "Budget pace" : "Budgets"}
@@ -177,6 +177,7 @@ function DashboardPage() {
               </p>
             ) : (
               <CategoryBars
+                currency={data.currency}
                 data={byCategory.map((c) => ({
                   ...c,
                   limitMinor: budgetByCategory.get(c.categoryId),

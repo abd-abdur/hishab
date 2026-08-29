@@ -4,6 +4,7 @@ import {
   CalendarClock,
   ChartColumn,
   FileText,
+  Globe,
   LayoutDashboard,
   LogOut,
   PiggyBank,
@@ -118,6 +119,12 @@ export function AppSidebar({ user }: { user: { name: string; email: string } }) 
                   <div className="text-xs text-muted-foreground">{user.email}</div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/">
+                    <Globe className="size-4" />
+                    Home page
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
                     void signOut().then(() => navigate({ to: "/login" }));

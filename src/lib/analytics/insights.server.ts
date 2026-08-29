@@ -43,7 +43,7 @@ export async function getInsights(
       generateText({
         model: categorizationModel(),
         system: `You write concise spending observations for a personal finance dashboard.
-Rules: use ONLY the numbers in the provided JSON — never invent, extrapolate, or estimate figures. Write 3 to 5 observations, one sentence each, most useful first. Format amounts like "AED 1,240". Refer to months by name. No advice-column tone, no exclamation marks, no emoji. Return one observation per line, no bullets or numbering.`,
+Rules: use ONLY the numbers in the provided JSON — never invent, extrapolate, or estimate figures. Write 3 to 5 observations, one sentence each, most useful first. Format amounts with the currency code given in the JSON, like "AED 1,240". Refer to months by name. No advice-column tone, no exclamation marks, no emoji. Return one observation per line, no bullets or numbering.`,
         prompt: payload,
         providerOptions: minimalThinking,
         abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),

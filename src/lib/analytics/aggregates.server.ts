@@ -23,7 +23,7 @@ export function monthRange(month: MonthKey): { from: string; to: string } {
   return { from, to };
 }
 
-export async function getSpendByCategory(userId: string, month: MonthKey) {
+export async function getSpendByCategory(userId: string, month: MonthKey, currency: string) {
   const { from, to } = monthRange(month);
   const rows = await db
     .select({
@@ -39,6 +39,7 @@ export async function getSpendByCategory(userId: string, month: MonthKey) {
     .where(
       and(
         eq(transactions.userId, userId),
+        eq(transactions.currency, currency),
         eq(categories.kind, "expense"),
         gte(transactions.txnDate, from),
         lte(transactions.txnDate, to),
@@ -66,7 +67,11 @@ export type MonthTotals = {
   incomeMinor: number;
 };
 
-export async function getMonthlyTotals(userId: string, monthsBack: number): Promise<MonthTotals[]> {
+export async function getMonthlyTotals(
+  userId: string,
+  monthsBack: number,
+  currency: string,
+): Promise<MonthTotals[]> {
   const result = await db.execute(sql`
     SELECT to_char(date_trunc('month', t.txn_date), 'YYYY-MM') AS month,
            sum(CASE WHEN c.kind = 'expense' AND t.direction = 'debit' THEN t.amount_minor
@@ -75,7 +80,7 @@ export async function getMonthlyTotals(userId: string, monthsBack: number): Prom
            sum(CASE WHEN c.kind = 'income' AND t.direction = 'credit' THEN t.amount_minor ELSE 0 END) AS income_minor
     FROM transactions t
     JOIN categories c ON c.id = t.category_id
-    WHERE t.user_id = ${userId}
+    WHERE t.user_id = ${userId} AND t.currency = ${currency}
       AND t.txn_date >= date_trunc('month', now())::date - (${monthsBack} || ' months')::interval
     GROUP BY 1
     ORDER BY 1
@@ -87,15 +92,18 @@ export async function getMonthlyTotals(userId: string, monthsBack: number): Prom
   }));
 }
 
-/** Daily spend for sparkline / calendar heatmap. */
-export async function getDailySpend(userId: string, from: string, to: string) {
+/**
+ * Daily spend for sparkline / calendar heatmap. Fetches a whole date range in
+ * one query; pace comparisons slice it locally instead of re-querying.
+ */
+export async function getDailySpend(userId: string, from: string, to: string, currency: string) {
   const result = await db.execute(sql`
     SELECT t.txn_date AS day,
            sum(CASE WHEN t.direction = 'debit' THEN t.amount_minor ELSE -t.amount_minor END) AS spend_minor,
            count(*) AS txn_count
     FROM transactions t
     JOIN categories c ON c.id = t.category_id
-    WHERE t.user_id = ${userId} AND c.kind = 'expense'
+    WHERE t.user_id = ${userId} AND t.currency = ${currency} AND c.kind = 'expense'
       AND t.txn_date >= ${from} AND t.txn_date <= ${to}
     GROUP BY 1
     ORDER BY 1
@@ -111,7 +119,7 @@ export async function getDailySpend(userId: string, from: string, to: string) {
  * Spend this month through a given day vs. previous month through the same
  * day — the honest "12% ahead of July at this point" comparison.
  */
-export async function getPaceComparison(userId: string, today: Date) {
+export async function getPaceComparison(userId: string, today: Date, currency: string) {
   const dayOfMonth = today.getDate();
   const thisMonth =
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}` as MonthKey;
@@ -126,22 +134,18 @@ export async function getPaceComparison(userId: string, today: Date) {
   const prevCut = `${prevRange.from.slice(0, 8)}${String(prevCutDay).padStart(2, "0")}`;
   const thisCut = `${thisRange.from.slice(0, 8)}${String(dayOfMonth).padStart(2, "0")}`;
 
-  const [thisDaily, prevDaily, prevFull] = await Promise.all([
-    getDailySpend(userId, thisRange.from, thisCut),
-    getDailySpend(userId, prevRange.from, prevCut),
-    getDailySpend(userId, prevRange.from, prevRange.to),
-  ]);
-
-  const sum = (rows: Array<{ spendMinor: number }>) =>
-    rows.reduce((total, r) => total + r.spendMinor, 0);
+  // one query spanning both months, sliced locally
+  const daily = await getDailySpend(userId, prevRange.from, thisRange.to, currency);
+  const sum = (from: string, to: string) =>
+    daily.reduce((total, r) => (r.day >= from && r.day <= to ? total + r.spendMinor : total), 0);
 
   return {
     thisMonth,
     prevMonth,
-    spendToDateMinor: sum(thisDaily),
-    prevSpendSamePointMinor: sum(prevDaily),
-    prevMonthTotalMinor: sum(prevFull),
-    dailySeries: thisDaily,
+    spendToDateMinor: sum(thisRange.from, thisCut),
+    prevSpendSamePointMinor: sum(prevRange.from, prevCut),
+    prevMonthTotalMinor: sum(prevRange.from, prevRange.to),
+    dailySeries: daily.filter((r) => r.day >= thisRange.from && r.day <= thisCut),
   };
 }
 
@@ -179,6 +183,7 @@ export async function getBudgetStatuses(userId: string, today: Date): Promise<Bu
         from transactions t
         where t.user_id = ${userId}
           and t.category_id = ${budgets.categoryId}
+          and t.currency = ${budgets.currency}
           and t.txn_date >= ${from} and t.txn_date <= ${to}
       ), 0)`,
     })
@@ -202,7 +207,13 @@ export async function getBudgetStatuses(userId: string, today: Date): Promise<Bu
   });
 }
 
-export async function getTopMerchants(userId: string, from: string, to: string, limit = 12) {
+export async function getTopMerchants(
+  userId: string,
+  from: string,
+  to: string,
+  currency: string,
+  limit = 12,
+) {
   const result = await db.execute(sql`
     SELECT t.merchant_norm, max(t.merchant_display) AS merchant_display,
            max(t.category_id) AS category_id,
@@ -210,7 +221,7 @@ export async function getTopMerchants(userId: string, from: string, to: string, 
            count(*) AS txn_count
     FROM transactions t
     JOIN categories c ON c.id = t.category_id
-    WHERE t.user_id = ${userId} AND c.kind = 'expense'
+    WHERE t.user_id = ${userId} AND t.currency = ${currency} AND c.kind = 'expense'
       AND t.txn_date >= ${from} AND t.txn_date <= ${to}
     GROUP BY t.merchant_norm
     HAVING sum(CASE WHEN t.direction = 'debit' THEN t.amount_minor ELSE -t.amount_minor END) > 0
@@ -226,24 +237,28 @@ export async function getTopMerchants(userId: string, from: string, to: string, 
   }));
 }
 
-/** Data freshness: the latest transaction date and statement count. */
+/**
+ * Data freshness plus the user's primary currency (their most common
+ * transaction currency) — one round trip, used to anchor every page.
+ */
 export async function getFreshness(userId: string) {
-  const [row] = await db
-    .select({
-      latestDate: sql<string | null>`max(${transactions.txnDate})`,
-      earliestDate: sql<string | null>`min(${transactions.txnDate})`,
-      txnCount: sql<string>`count(*)`,
-    })
-    .from(transactions)
-    .where(eq(transactions.userId, userId));
-  const [stmts] = await db
-    .select({ count: sql<string>`count(*)` })
-    .from(statements)
-    .where(eq(statements.userId, userId));
+  const result = await db.execute(sql`
+    SELECT max(txn_date) AS latest_date,
+           min(txn_date) AS earliest_date,
+           count(*) AS txn_count,
+           mode() WITHIN GROUP (ORDER BY currency) AS primary_currency,
+           count(DISTINCT currency) AS currency_count,
+           (SELECT count(*) FROM statements s WHERE s.user_id = ${userId}) AS stmt_count
+    FROM transactions
+    WHERE user_id = ${userId}
+  `);
+  const row = (result.rows as Array<Record<string, unknown>>)[0];
   return {
-    latestDate: row?.latestDate ?? null,
-    earliestDate: row?.earliestDate ?? null,
-    transactionCount: num(row?.txnCount),
-    statementCount: num(stmts?.count),
+    latestDate: row?.["latest_date"] ? String(row["latest_date"]).slice(0, 10) : null,
+    earliestDate: row?.["earliest_date"] ? String(row["earliest_date"]).slice(0, 10) : null,
+    transactionCount: num(row?.["txn_count"]),
+    statementCount: num(row?.["stmt_count"]),
+    primaryCurrency: row?.["primary_currency"] ? String(row["primary_currency"]) : "AED",
+    currencyCount: num(row?.["currency_count"]),
   };
 }

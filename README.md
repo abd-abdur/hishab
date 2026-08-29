@@ -2,7 +2,7 @@
 
 Every dirham, accounted for. Upload bank statements — text PDFs, scans, photos, CSV or Excel —
 and hishab turns them into verified transactions, budgets, recurring-charge tracking and trends.
-Built for AED.
+AED-first, fluent in any currency.
 
 ## How it works
 

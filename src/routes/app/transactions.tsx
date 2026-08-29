@@ -156,7 +156,7 @@ function TransactionsPage() {
         title="Transactions"
         description={
           summary
-            ? `${summary.total} transactions · −${formatMoney(summary.totalDebitMinor)} · +${formatMoney(summary.totalCreditMinor)}`
+            ? `${summary.total} transactions · −${formatMoney(summary.totalDebitMinor, summary.currency)} · +${formatMoney(summary.totalCreditMinor, summary.currency)}`
             : undefined
         }
         actions={

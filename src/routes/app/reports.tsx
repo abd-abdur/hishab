@@ -122,7 +122,7 @@ function ReportsPage() {
                   <CardTitle className="text-base">Income vs spend</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <MonthlyTrend data={data?.monthly ?? []} />
+                  <MonthlyTrend data={data?.monthly ?? []} currency={data?.currency ?? "AED"} />
                 </CardContent>
               </Card>
               <Card>
@@ -134,13 +134,20 @@ function ReportsPage() {
                     <p className="text-sm text-muted-foreground">No spending this month.</p>
                   ) : (
                     <div className="grid items-center gap-4 sm:grid-cols-2">
-                      <CategoryDonut data={data?.byCategory ?? []} />
+                      <CategoryDonut
+                        data={data?.byCategory ?? []}
+                        currency={data?.currency ?? "AED"}
+                      />
                       <ul className="space-y-1.5 text-sm">
                         {(data?.byCategory ?? []).slice(0, 8).map((c) => (
                           <li key={c.categoryId} className="flex items-center gap-2">
                             <CategoryDot color={c.color} />
                             <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                            <Money value={c.spendMinor} className="text-sm text-muted-foreground" />
+                            <Money
+                              value={c.spendMinor}
+                              currency={data?.currency ?? "AED"}
+                              className="text-sm text-muted-foreground"
+                            />
                           </li>
                         ))}
                       </ul>
@@ -159,6 +166,7 @@ function ReportsPage() {
                   <CashflowCalendar
                     month={month}
                     data={data?.daily ?? []}
+                    currency={data?.currency ?? "AED"}
                     onSelectDay={setSelectedDay}
                   />
                 </CardContent>
@@ -186,7 +194,11 @@ function ReportsPage() {
                           <span className="text-xs text-muted-foreground">
                             {m.count} transaction{m.count === 1 ? "" : "s"}
                           </span>
-                          <Money value={m.spendMinor} className="text-sm" />
+                          <Money
+                            value={m.spendMinor}
+                            currency={data?.currency ?? "AED"}
+                            className="text-sm"
+                          />
                         </div>
                       ))}
                     </div>

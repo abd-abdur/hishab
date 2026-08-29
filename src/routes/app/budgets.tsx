@@ -39,6 +39,7 @@ function BudgetsPage() {
   const { data: budgets, isPending } = useQuery({
     queryKey: ["budgets"],
     queryFn: () => getBudgetsFn(),
+    staleTime: 30_000,
   });
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -189,7 +190,7 @@ function BudgetsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="budget-amount">Monthly limit (AED)</Label>
+              <Label htmlFor="budget-amount">Monthly limit</Label>
               <Input
                 id="budget-amount"
                 type="number"
