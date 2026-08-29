@@ -276,14 +276,21 @@ function TransactionsPage() {
               </dd>
             </div>
             <div className="bg-card px-4 py-3">
-              <dt className="text-xs text-muted-foreground">Moved between my accounts</dt>
-              {summary.transferOutMinor > 0 || summary.transferInMinor > 0 ? (
-                <dd className="num mt-0.5 text-sm text-muted-foreground">
-                  <span className="block">
-                    {formatMoney(summary.transferInMinor, summary.currency)} came in
+              <dt className="text-xs text-muted-foreground">Between my accounts</dt>
+              {summary.transferCount > 0 ? (
+                <dd className="mt-0.5">
+                  <span className="num font-medium text-muted-foreground">
+                    {summary.transferCount} transfer{summary.transferCount === 1 ? "" : "s"}
                   </span>
-                  <span className="block">
-                    {formatMoney(summary.transferOutMinor, summary.currency)} went out
+                  <span className="block text-xs text-muted-foreground">
+                    not counted in these totals ·{" "}
+                    <button
+                      type="button"
+                      onClick={() => setSearch({ cat: "sys_transfers" })}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      view
+                    </button>
                   </span>
                 </dd>
               ) : (

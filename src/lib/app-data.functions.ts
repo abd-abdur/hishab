@@ -91,6 +91,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
           .select({
             outMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'debit'), 0)`,
             inMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'credit'), 0)`,
+            moveCount: sql<string>`count(*)`,
           })
           .from(transactions)
           .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -161,6 +162,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
         transfers: {
           outMinor: Number(transferTotals[0]?.outMinor ?? 0),
           inMinor: Number(transferTotals[0]?.inMinor ?? 0),
+          count: Number(transferTotals[0]?.moveCount ?? 0),
         },
         recent,
         upcoming,
@@ -207,6 +209,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
           .select({
             outMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'debit'), 0)`,
             inMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'credit'), 0)`,
+            moveCount: sql<string>`count(*)`,
           })
           .from(transactions)
           .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -269,6 +272,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
       transfers: {
         outMinor: Number(transferTotals[0]?.outMinor ?? 0),
         inMinor: Number(transferTotals[0]?.inMinor ?? 0),
+        count: Number(transferTotals[0]?.moveCount ?? 0),
       },
       recent,
       upcoming,
@@ -416,6 +420,7 @@ export const getTransactionsFn = createServerFn({ method: "GET" })
           incomeMinor: sql<string>`coalesce(sum(case when ${categories.kind} = 'income' then (case when ${transactions.direction} = 'credit' then ${transactions.amountMinor} else -${transactions.amountMinor} end) else 0 end), 0)`,
           transferOutMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${categories.kind} = 'transfer' and ${transactions.direction} = 'debit'), 0)`,
           transferInMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${categories.kind} = 'transfer' and ${transactions.direction} = 'credit'), 0)`,
+          transferCount: sql<string>`count(*) filter (where ${categories.kind} = 'transfer')`,
           currency: sql<string | null>`mode() within group (order by ${transactions.currency})`,
         })
         .from(transactions)
@@ -429,6 +434,7 @@ export const getTransactionsFn = createServerFn({ method: "GET" })
       incomeMinor: Number(totals?.incomeMinor ?? 0),
       transferOutMinor: Number(totals?.transferOutMinor ?? 0),
       transferInMinor: Number(totals?.transferInMinor ?? 0),
+      transferCount: Number(totals?.transferCount ?? 0),
       currency: totals?.currency ?? "AED",
     };
   });
