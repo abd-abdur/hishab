@@ -1,7 +1,7 @@
 import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-import { clearStoredKeys } from "@/lib/keys.client";
+import { clearStoredKeys } from "@/lib/key-store";
 
 export const authClient = createAuthClient({
   plugins: [twoFactorClient()],

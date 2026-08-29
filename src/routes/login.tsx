@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient, authErrorMessage, signIn, twoFactor } from "@/lib/auth-client";
-import { unlockWithPassword, unlockWithRecoveryCode } from "@/lib/keys.client";
+import { unlockWithPassword, unlockWithRecoveryCode } from "@/lib/key-store";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,

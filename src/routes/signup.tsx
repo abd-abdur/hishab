@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authErrorMessage, isExistingAccountError, signUp } from "@/lib/auth-client";
-import { unlockWithPassword } from "@/lib/keys.client";
+import { unlockWithPassword } from "@/lib/key-store";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
