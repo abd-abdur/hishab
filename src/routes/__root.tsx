@@ -1,5 +1,7 @@
 import "@fontsource-variable/inter";
 
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -127,6 +129,10 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster />
+      {/* Vercel Web Analytics + Speed Insights — cookieless, page views and
+          Core Web Vitals only; no-ops outside Vercel deployments */}
+      <Analytics />
+      <SpeedInsights />
     </QueryClientProvider>
   );
 }
