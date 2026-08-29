@@ -262,19 +262,16 @@ function DashboardPage() {
                 }
               />
             )}
-            {data.transfers.outMinor > 0 || data.transfers.inMinor > 0 ? (
+            {data.transfers.count > 0 ? (
               <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
-                Transfers between your accounts (not counted as spending):{" "}
-                <span className="num">−{formatMoney(data.transfers.outMinor, data.currency)}</span>{" "}
-                out ·{" "}
-                <span className="num">+{formatMoney(data.transfers.inMinor, data.currency)}</span>{" "}
-                in ·{" "}
+                Plus {data.transfers.count} transfer{data.transfers.count === 1 ? "" : "s"} between
+                your own accounts — money that changed pockets, not spending ·{" "}
                 <Link
                   to="/app/transactions"
                   search={{ cat: "sys_transfers" }}
                   className="font-medium text-primary hover:underline"
                 >
-                  view
+                  view them
                 </Link>
               </p>
             ) : null}
