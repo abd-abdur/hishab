@@ -9,12 +9,23 @@ type Slice = { categoryId: string; name: string; color: string; spendMinor: numb
 export const CategoryDonut = memo(function CategoryDonut({
   data,
   currency = "AED",
+  centerLabel,
 }: {
   data: Slice[];
   currency?: string;
+  /** e.g. the period's total, shown in the donut's hole */
+  centerLabel?: { title: string; value: number } | undefined;
 }) {
   return (
-    <div className="h-64">
+    <div className="relative h-64">
+      {centerLabel ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xs text-muted-foreground">{centerLabel.title}</span>
+          <span className="num text-lg font-semibold">
+            {formatMoney(centerLabel.value, currency)}
+          </span>
+        </div>
+      ) : null}
       <ResponsiveContainer width="100%" height="100%" debounce={150}>
         <PieChart>
           <Pie

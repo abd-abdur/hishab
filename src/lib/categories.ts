@@ -100,7 +100,7 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     slug: "bnpl",
     name: "BNPL",
     icon: "credit-card",
-    color: "chart-12",
+    color: "chart-13",
     kind: "expense",
     sortOrder: 12,
   },
@@ -117,7 +117,7 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     slug: "p2p-out",
     name: "Sent to People",
     icon: "send",
-    color: "chart-2",
+    color: "chart-14",
     kind: "expense",
     sortOrder: 14,
   },
@@ -134,7 +134,7 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     slug: "p2p-in",
     name: "Received from People",
     icon: "hand-coins",
-    color: "chart-8",
+    color: "chart-15",
     kind: "income",
     sortOrder: 16,
   },
@@ -156,7 +156,7 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
   },
 ];
 
-export const CHART_SLOTS = Array.from({ length: 12 }, (_, i) => `chart-${i + 1}`);
+export const CHART_SLOTS = Array.from({ length: 16 }, (_, i) => `chart-${i + 1}`);
 
 /** Next unused chart slot for a user-created category. */
 export function nextChartSlot(usedColors: string[]): string {

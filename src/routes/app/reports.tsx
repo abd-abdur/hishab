@@ -9,6 +9,7 @@ import { Money } from "@/components/app/money";
 import { PageHeader } from "@/components/app/page-header";
 import { CashflowCalendar } from "@/components/charts/cashflow-calendar";
 import { CategoryDonut } from "@/components/charts/category-donut";
+import { CategoryStackedTrend } from "@/components/charts/category-stacked-trend";
 import { MonthlyTrend } from "@/components/charts/monthly-trend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,7 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDayTransactionsFn, getReportsFn } from "@/lib/app-data.functions";
-import { formatDateLong } from "@/lib/money";
+import { formatDateLong, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/reports")({
   component: ReportsPage,
@@ -81,6 +82,51 @@ function ReportsPage() {
 
   const hasData = (data?.monthly ?? []).some((m) => m.spendMinor > 0 || m.incomeMinor > 0);
 
+  // donut: top 8 slices, the tail folded into a muted "Other"
+  const donutData = useMemo(() => {
+    const cats = data?.byCategory ?? [];
+    if (cats.length <= 8) return cats;
+    const top = cats.slice(0, 8);
+    const otherTotal = cats.slice(8).reduce((sum, c) => sum + c.spendMinor, 0);
+    return [
+      ...top,
+      {
+        categoryId: "other",
+        name: "Other",
+        color: "chart-10",
+        icon: "tag",
+        spendMinor: otherTotal,
+        count: 0,
+      },
+    ];
+  }, [data?.byCategory]);
+  const donutTotal = useMemo(
+    () => (data?.byCategory ?? []).reduce((sum, c) => sum + c.spendMinor, 0),
+    [data?.byCategory],
+  );
+
+  // biggest movers: latest trend month vs the one before it
+  const movers = useMemo(() => {
+    const trend = data?.categoryTrend ?? [];
+    const months = [...new Set(trend.map((t) => t.month))].sort();
+    if (months.length < 2) return [];
+    const [prevMonth, currMonth] = [months[months.length - 2], months[months.length - 1]];
+    const byCat = new Map<string, { name: string; color: string; prev: number; curr: number }>();
+    for (const t of trend) {
+      if (t.month !== prevMonth && t.month !== currMonth) continue;
+      const entry = byCat.get(t.categoryId) ?? { name: t.name, color: t.color, prev: 0, curr: 0 };
+      if (t.month === prevMonth) entry.prev = Math.max(0, t.spendMinor);
+      else entry.curr = Math.max(0, t.spendMinor);
+      byCat.set(t.categoryId, entry);
+    }
+    return [...byCat.values()]
+      .filter((e) => e.prev > 0 || e.curr > 0)
+      .map((e) => ({ ...e, delta: e.curr - e.prev }))
+      .filter((e) => e.delta !== 0)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+      .slice(0, 6);
+  }, [data?.categoryTrend]);
+
   return (
     <>
       <PageHeader
@@ -134,19 +180,23 @@ function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {(data?.byCategory ?? []).length === 0 ? (
+                  {donutData.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No spending this month.</p>
                   ) : (
                     <div className="grid items-center gap-4 sm:grid-cols-2">
                       <CategoryDonut
-                        data={data?.byCategory ?? []}
+                        data={donutData}
                         currency={data?.currency ?? "AED"}
+                        centerLabel={{ title: "total", value: donutTotal }}
                       />
                       <ul className="space-y-1.5 text-sm">
-                        {(data?.byCategory ?? []).slice(0, 8).map((c) => (
+                        {donutData.map((c) => (
                           <li key={c.categoryId} className="flex items-center gap-2">
                             <CategoryDot color={c.color} />
                             <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                            <span className="num w-10 text-right text-xs text-muted-foreground">
+                              {donutTotal > 0 ? Math.round((c.spendMinor / donutTotal) * 100) : 0}%
+                            </span>
                             <Money
                               value={c.spendMinor}
                               currency={data?.currency ?? "AED"}
@@ -159,6 +209,57 @@ function ReportsPage() {
                   )}
                 </CardContent>
               </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-base">Categories, month by month</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Top categories stacked per month — the shape of where the money goes
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {(data?.categoryTrend ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Not enough history yet.</p>
+                  ) : (
+                    <CategoryStackedTrend
+                      data={data?.categoryTrend ?? []}
+                      currency={data?.currency ?? "AED"}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {movers.length > 0 ? (
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="text-base">Biggest changes vs last month</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                      {movers.map((m) => (
+                        <li key={m.name} className="flex items-center gap-2 text-sm">
+                          <CategoryDot color={m.color} />
+                          <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                          <Money
+                            value={m.curr}
+                            currency={data?.currency ?? "AED"}
+                            className="text-sm text-muted-foreground"
+                          />
+                          <span
+                            className={`num w-24 text-right text-xs ${
+                              m.delta > 0 ? "text-negative" : "text-positive"
+                            }`}
+                          >
+                            {m.prev === 0
+                              ? "new"
+                              : `${m.delta > 0 ? "+" : "−"}${formatMoney(Math.abs(m.delta), data?.currency ?? "AED")}`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="calendar" className="mt-4">

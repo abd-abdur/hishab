@@ -60,6 +60,10 @@
   --color-chart-10: var(--chart-10);
   --color-chart-11: var(--chart-11);
   --color-chart-12: var(--chart-12);
+  --color-chart-13: var(--chart-13);
+  --color-chart-14: var(--chart-14);
+  --color-chart-15: var(--chart-15);
+  --color-chart-16: var(--chart-16);
   --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --shadow-card: var(--shadow-card);
@@ -115,6 +119,10 @@
   --chart-10: oklch(0.5 0.02 85);
   --chart-11: oklch(0.65 0.12 350);
   --chart-12: oklch(0.6 0.12 220);
+  --chart-13: oklch(0.54 0.12 305);
+  --chart-14: oklch(0.6 0.14 45);
+  --chart-15: oklch(0.6 0.1 150);
+  --chart-16: oklch(0.45 0.06 260);
 
   --shadow-card: 0 1px 2px oklch(0.235 0.012 85 / 6%), 0 4px 12px -4px oklch(0.235 0.012 85 / 8%);
 }
@@ -165,6 +173,10 @@
   --chart-10: oklch(0.65 0.015 85);
   --chart-11: oklch(0.76 0.11 350);
   --chart-12: oklch(0.72 0.11 220);
+  --chart-13: oklch(0.7 0.12 305);
+  --chart-14: oklch(0.74 0.13 45);
+  --chart-15: oklch(0.74 0.1 150);
+  --chart-16: oklch(0.62 0.06 260);
 
   --shadow-card: 0 1px 2px oklch(0 0 0 / 30%);
 }
