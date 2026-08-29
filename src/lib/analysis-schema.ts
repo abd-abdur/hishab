@@ -61,4 +61,15 @@ Rules:
 - insights: 4 to 6 short, specific, data-backed sentences (max 160 characters each).
 - recommendations: 3 to 4 concrete actions with an estimated monthly potentialSaving.
 - healthScore is 0-100. healthVerdict is at most 8 words.
+- Use EXACTLY these JSON keys and no others:
+  bankName, accountLabel, currency, periodLabel, totalIncome, totalExpenses, netCashflow, openingBalance, closingBalance, averageDailySpend, transactionCount, busiestDay, savingsRate,
+  categories: [{ name, amount, percentage, transactions }],
+  timeline: [{ label, income, expenses }],
+  topMerchants: [{ name, amount, count }],
+  recurring: [{ name, amount, cadence }],
+  largestTransactions: [{ date, description, category, amount }],
+  insights: [string],
+  recommendations: [{ title, detail, potentialSaving }],
+  healthScore, healthVerdict.
+- Every listed key is REQUIRED. Keep text fields short so the JSON is always complete.
 - If a value is genuinely absent, infer a sensible estimate from the data rather than returning 0. Never invent a currency: use the one in the statement, defaulting to "USD".`;

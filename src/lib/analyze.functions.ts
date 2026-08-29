@@ -23,6 +23,7 @@ export const analyzeStatement = createServerFn({ method: "POST" })
         model: gateway("google/gemini-3.7-flash"),
         system: ANALYST_SYSTEM_PROMPT,
         output: Output.object({ schema: AnalysisSchema }),
+        maxOutputTokens: 12000,
         prompt: `Statement text:\n\n${text}`,
       });
       return (await result.output) as SpendingAnalysis;
