@@ -20,6 +20,7 @@ export type TransactionRow = {
   categoryId: string;
   categorySource: "rule" | "dictionary" | "model" | "user";
   isAnomaly: boolean;
+  matchedTransfer: boolean;
 };
 
 const ROW_HEIGHT = 48;
@@ -64,6 +65,15 @@ const Row = memo(function Row({
           {row.isAnomaly ? (
             <Badge variant="outline" className="ml-2 align-middle text-[11px] text-warning">
               unusual
+            </Badge>
+          ) : null}
+          {row.matchedTransfer ? (
+            <Badge
+              variant="outline"
+              className="ml-2 align-middle text-[11px] text-muted-foreground"
+              title="An opposite entry with the same amount exists in another of your statements — one internal move, seen from both accounts"
+            >
+              own move
             </Badge>
           ) : null}
         </span>

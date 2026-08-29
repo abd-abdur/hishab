@@ -88,14 +88,32 @@ export const getDashboardFn = createServerFn({ method: "GET" })
       `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}` as MonthKey;
     const currency = freshness.primaryCurrency;
 
+    const { from: monthFrom, to: monthTo } = monthRange(month);
+
     // one parallel wave — the fewer sequential round trips to the database,
     // the faster the page paints
-    const [pace, byCategory, budgetStatuses, monthly, recent, upcoming, anomalies] =
+    const [pace, byCategory, budgetStatuses, monthly, transferTotals, recent, upcoming, anomalies] =
       await Promise.all([
         getPaceComparison(userId, anchor, currency),
         getSpendByCategory(userId, month, currency),
         getBudgetStatuses(userId, anchor),
         getMonthlyTotals(userId, 6, currency),
+        db
+          .select({
+            outMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'debit'), 0)`,
+            inMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'credit'), 0)`,
+          })
+          .from(transactions)
+          .innerJoin(categories, eq(transactions.categoryId, categories.id))
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              eq(categories.kind, "transfer"),
+              eq(transactions.currency, currency),
+              gte(transactions.txnDate, monthFrom),
+              lte(transactions.txnDate, monthTo),
+            ),
+          ),
         db
           .select({
             id: transactions.id,
@@ -141,6 +159,10 @@ export const getDashboardFn = createServerFn({ method: "GET" })
       budgets: budgetStatuses,
       freshness,
       monthly,
+      transfers: {
+        outMinor: Number(transferTotals[0]?.outMinor ?? 0),
+        inMinor: Number(transferTotals[0]?.inMinor ?? 0),
+      },
       recent,
       upcoming,
       anomalies,
@@ -250,6 +272,24 @@ export const getTransactionsFn = createServerFn({ method: "GET" })
           categorySource: transactions.categorySource,
           isAnomaly: transactions.isAnomaly,
           statementId: transactions.statementId,
+          // an internal move seen from both accounts: this transfer row has an
+          // opposite-direction twin (same amount, ±3 days) in another statement
+          matchedTransfer: sql<boolean>`(
+            exists (
+              select 1 from categories ca
+              where ca.id = ${transactions.categoryId} and ca.kind = 'transfer'
+            )
+            and exists (
+              select 1 from transactions b
+              join categories cb on cb.id = b.category_id
+              where b.user_id = ${transactions.userId}
+                and b.amount_minor = ${transactions.amountMinor}
+                and b.direction != ${transactions.direction}
+                and b.statement_id != ${transactions.statementId}
+                and abs(b.txn_date - ${transactions.txnDate}) <= 3
+                and cb.kind = 'transfer'
+            )
+          )`,
         })
         .from(transactions)
         .where(where)

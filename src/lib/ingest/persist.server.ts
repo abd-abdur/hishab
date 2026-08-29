@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { recurringSeries, statements, transactions } from "@/db/schema";
@@ -128,28 +128,69 @@ export async function refreshRecurringSeries(userId: string): Promise<void> {
 
 /**
  * A debit is flagged unusual when it exceeds 3× the median debit of its
- * category (with a floor of AED 100). A category needs at least four debits
- * before it has a "usual" — a lone hotel booking is not above anything.
+ * EXPENSE category (with a floor of AED 100). A category needs at least four
+ * debits before it has a "usual" — a lone hotel booking is not above
+ * anything — and transfers never flag: moving your own money isn't spending.
  */
 async function refreshAnomalyFlags(userId: string): Promise<void> {
   await db.execute(sql`
     WITH category_medians AS (
-      SELECT category_id,
-             percentile_cont(0.5) WITHIN GROUP (ORDER BY amount_minor) AS median_amount,
+      SELECT t.category_id,
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY t.amount_minor) AS median_amount,
              count(*) AS sample_count
-      FROM transactions
-      WHERE user_id = ${userId} AND direction = 'debit'
-      GROUP BY category_id
+      FROM transactions t
+      JOIN categories c ON c.id = t.category_id
+      WHERE t.user_id = ${userId} AND t.direction = 'debit' AND c.kind = 'expense'
+      GROUP BY t.category_id
     )
     UPDATE transactions t
-    SET is_anomaly = (
+    SET is_anomaly = COALESCE(
       t.direction = 'debit'
       AND m.sample_count >= 4
-      AND t.amount_minor > GREATEST(m.median_amount * 3, 10000)
+      AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
+      false
     )
-    FROM category_medians m
-    WHERE t.user_id = ${userId} AND t.category_id = m.category_id
+    FROM categories c
+    LEFT JOIN category_medians m ON m.category_id = c.id
+    WHERE t.user_id = ${userId} AND t.category_id = c.id
+      AND t.is_anomaly != COALESCE(
+        t.direction = 'debit'
+        AND m.sample_count >= 4
+        AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
+        false
+      )
   `);
+}
+
+/**
+ * Cross-document near-duplicates: rows whose (date, amount, direction)
+ * already exist under a DIFFERENT merchant label — the signature of a fee
+ * invoice or overlapping export describing charges another statement already
+ * carries. Exact same-label duplicates are handled by the dedup hash.
+ */
+export async function findSimilarRowKeys(
+  userId: string,
+  rows: Array<{ txnDate: string; amountMinor: number; direction: "debit" | "credit" }>,
+): Promise<Set<string>> {
+  if (rows.length === 0) return new Set();
+  const dates = rows.map((r) => r.txnDate).sort();
+  const amounts = [...new Set(rows.map((r) => r.amountMinor))];
+  const existing = await db
+    .select({
+      txnDate: transactions.txnDate,
+      amountMinor: transactions.amountMinor,
+      direction: transactions.direction,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        gte(transactions.txnDate, dates[0] as string),
+        lte(transactions.txnDate, dates[dates.length - 1] as string),
+        inArray(transactions.amountMinor, amounts),
+      ),
+    );
+  return new Set(existing.map((r) => `${r.txnDate}|${r.amountMinor}|${r.direction}`));
 }
 
 /** Existing dedup hashes, used to badge duplicates in the review table. */

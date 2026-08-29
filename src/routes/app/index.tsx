@@ -255,6 +255,22 @@ function DashboardPage() {
                 }
               />
             )}
+            {data.transfers.outMinor > 0 || data.transfers.inMinor > 0 ? (
+              <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
+                Transfers between your accounts (not counted as spending):{" "}
+                <span className="num">−{formatMoney(data.transfers.outMinor, data.currency)}</span>{" "}
+                out ·{" "}
+                <span className="num">+{formatMoney(data.transfers.inMinor, data.currency)}</span>{" "}
+                in ·{" "}
+                <Link
+                  to="/app/transactions"
+                  search={{ cat: "sys_transfers" }}
+                  className="font-medium text-primary hover:underline"
+                >
+                  view
+                </Link>
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
