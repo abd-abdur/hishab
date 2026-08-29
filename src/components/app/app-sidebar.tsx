@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { OPEN_COMMAND_MENU_EVENT } from "@/components/app/command-menu";
+import { BrandMark } from "@/components/brand";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -60,9 +61,7 @@ export function AppSidebar({ user }: { user: { name: string; email: string } }) 
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <Link to="/app" className="flex items-center gap-2 px-2 py-1.5">
-          <span className="flex size-7 items-center justify-center rounded-md bg-primary font-display text-base font-semibold text-primary-foreground">
-            h
-          </span>
+          <BrandMark size={26} />
           <span className="font-display text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
             hishab
           </span>

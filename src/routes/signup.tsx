@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { CircleAlert } from "lucide-react";
 import { useState } from "react";
 
+import { BrandMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,9 +50,7 @@ function SignupPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <Link to="/" className="mb-6 flex items-center justify-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-md bg-primary font-display text-lg font-semibold text-primary-foreground">
-            h
-          </span>
+          <BrandMark size={30} />
           <span className="font-display text-2xl font-semibold tracking-tight">hishab</span>
         </Link>
         <Card>

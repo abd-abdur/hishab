@@ -9,6 +9,8 @@ export type CommitResult = {
   statementId: string;
   inserted: number;
   skippedDuplicates: number;
+  /** distinct calendar months the user now has data for */
+  monthsWithData: number;
 };
 
 export async function commitStatement(userId: string, input: CommitInput): Promise<CommitResult> {
@@ -66,7 +68,15 @@ export async function commitStatement(userId: string, input: CommitInput): Promi
   await refreshRecurringSeries(userId);
   await refreshAnomalyFlags(userId);
 
-  return { statementId, inserted: insertedCount, skippedDuplicates: skipped };
+  const monthsResult = await db.execute(sql`
+    SELECT count(DISTINCT date_trunc('month', txn_date)) AS months
+    FROM transactions WHERE user_id = ${userId}
+  `);
+  const monthsWithData = Number(
+    (monthsResult.rows as Array<Record<string, unknown>>)[0]?.["months"] ?? 0,
+  );
+
+  return { statementId, inserted: insertedCount, skippedDuplicates: skipped, monthsWithData };
 }
 
 export async function deleteStatement(userId: string, statementId: string): Promise<void> {

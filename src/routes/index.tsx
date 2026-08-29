@@ -5,6 +5,13 @@ import { ArrowRight, CalendarClock, CheckCircle2, SlidersHorizontal } from "luci
 
 import { useSession } from "@/lib/auth-client";
 
+import { BrandMark, Wordmark as BrandWordmark } from "@/components/brand";
+import {
+  BudgetPreview,
+  RecurringPreview,
+  ReviewPreview,
+} from "@/components/landing/truth-previews";
+
 import { CategoryDot } from "@/components/app/category-icon";
 import { CategoryBars } from "@/components/charts/category-bars";
 import { SpendSparkline } from "@/components/charts/spend-sparkline";
@@ -25,11 +32,8 @@ export const Route = createFileRoute("/")({
 
 function Wordmark() {
   return (
-    <Link to="/" className="flex items-center gap-2">
-      <span className="flex size-7 items-center justify-center rounded-md bg-primary font-display text-base font-semibold text-primary-foreground">
-        h
-      </span>
-      <span className="font-display text-xl font-semibold tracking-tight">hishab</span>
+    <Link to="/" aria-label="hishab home">
+      <BrandWordmark markSize={26} />
     </Link>
   );
 }
@@ -87,16 +91,19 @@ function DashboardPreview() {
 const TRUTHS = [
   {
     icon: CheckCircle2,
+    preview: ReviewPreview,
     title: "You approve every row",
     body: "Statements are transcribed into individual transactions and shown to you first — editable, with duplicates flagged. Where a statement prints balances, Hishab checks that the rows add up to the fils and tells you when they don't.",
   },
   {
     icon: CalendarClock,
+    preview: RecurringPreview,
     title: "Subscriptions can't hide",
     body: "Recurring charges are detected from your actual history — cadence, next expected date, and price rises like a streaming plan quietly going from AED 39 to AED 45.",
   },
   {
     icon: SlidersHorizontal,
+    preview: BudgetPreview,
     title: "Budgets with an honest pace",
     body: 'Set a monthly limit per category and see a projection from your real pace — "on track to hit AED 1,860 of 2,000" — always labeled with how far your data actually goes.',
   },
@@ -193,12 +200,15 @@ function LandingPage() {
       <section className="border-t bg-card/50">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
           {TRUTHS.map((truth) => (
-            <div key={truth.title}>
+            <div key={truth.title} className="flex flex-col">
               <truth.icon className="size-5 text-primary" aria-hidden />
               <h2 className="mt-3 font-display text-xl font-semibold tracking-tight">
                 {truth.title}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{truth.body}</p>
+              <div className="mt-4">
+                <truth.preview />
+              </div>
             </div>
           ))}
         </div>
@@ -244,9 +254,7 @@ function LandingPage() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="flex size-5 items-center justify-center rounded bg-primary font-display text-xs font-semibold text-primary-foreground">
-              h
-            </span>
+            <BrandMark size={20} />
             hishab — every dirham, accounted for
           </div>
           <div className="flex items-center gap-1.5">

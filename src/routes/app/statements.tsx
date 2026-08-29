@@ -39,10 +39,13 @@ export const Route = createFileRoute("/app/statements")({
   component: StatementsPage,
 });
 
+const MONTH_TWO_SEEN_KEY = "hishab-month-two-seen";
+
 function StatementsPage() {
   const queryClient = useQueryClient();
   const { files, addFiles, removeFile, updateDraftRows } = useStatementUpload();
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [monthTwoOpen, setMonthTwoOpen] = useState(false);
 
   const { data: statements, isPending } = useQuery({
     queryKey: ["statements"],
@@ -74,6 +77,15 @@ function StatementsPage() {
       removeFile(variables.fileId);
       setReviewingId(null);
       void queryClient.invalidateQueries();
+      // the product comes alive with a second month of data — mark the moment, once
+      try {
+        if (result.monthsWithData >= 2 && !localStorage.getItem(MONTH_TWO_SEEN_KEY)) {
+          localStorage.setItem(MONTH_TWO_SEEN_KEY, "1");
+          setMonthTwoOpen(true);
+        }
+      } catch {
+        /* storage unavailable — skip the moment */
+      }
     },
     onError: () => toast.error("Saving failed. Your review is still here — try again."),
   });
@@ -220,6 +232,40 @@ function StatementsPage() {
               </DialogFooter>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={monthTwoOpen} onOpenChange={setMonthTwoOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">
+              Two months of data — your trends just came alive
+            </DialogTitle>
+            <DialogDescription>This is where hishab starts earning its keep.</DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-2.5 text-sm">
+            <li className="flex gap-2">
+              <span className="mt-2 size-1 shrink-0 rounded-full bg-primary" />
+              Your Overview now compares this month's pace against last month, day for day.
+            </li>
+            <li className="flex gap-2">
+              <span className="mt-2 size-1 shrink-0 rounded-full bg-primary" />
+              Recurring detection has more history to work with — subscriptions and price changes
+              start surfacing.
+            </li>
+            <li className="flex gap-2">
+              <span className="mt-2 size-1 shrink-0 rounded-full bg-primary" />
+              Budgets can pace against what you actually spent, not a guess.
+            </li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" asChild>
+              <Link to="/app">See your overview</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/app/budgets">Set budgets</Link>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
