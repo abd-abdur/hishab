@@ -12,6 +12,9 @@ export const Route = createFileRoute("/app")({
     if (!session) {
       throw redirect({ to: "/login" });
     }
+    if (session.needsReactivation) {
+      throw redirect({ to: "/verify-email" });
+    }
     return { session };
   },
   component: AppLayout,

@@ -32,6 +32,25 @@ function createAuth() {
       },
     }),
     trustedOrigins: [...(baseUrl ? [baseUrl] : []), ...(vercelUrl ? [`https://${vercelUrl}`] : [])],
+    user: {
+      additionalFields: {
+        lastVerifiedAt: { type: "date", required: false, input: false },
+      },
+    },
+    databaseHooks: {
+      user: {
+        update: {
+          // Whenever a verification link is clicked (emailVerified flips on),
+          // restart the 7-day re-verification clock.
+          before: async (data) => {
+            if ((data as { emailVerified?: boolean }).emailVerified === true) {
+              return { data: { ...data, lastVerifiedAt: new Date() } };
+            }
+            return { data };
+          },
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       // The password will eventually protect the client-side encryption key,
