@@ -38,9 +38,26 @@ export const DraftStatementSchema = z.object({
   reconciliationDeltaMinor: z.number().int().nullable(),
 });
 
+/**
+ * Commit payloads differ from review drafts: the client encrypts identifying
+ * text before committing, so these fields carry ciphertext JSON (or an HMAC
+ * token for merchantNorm) and need room for the overhead.
+ */
+const CommitRowSchema = DraftRowSchema.extend({
+  description: z.string().min(1).max(4000),
+  merchantNorm: z.string().min(1).max(500),
+  merchantDisplay: z.string().min(1).max(2000),
+});
+
+const CommitStatementSchema = DraftStatementSchema.extend({
+  fileName: z.string().min(1).max(2000),
+  bankName: z.string().max(2000).nullable(),
+  accountNumberMasked: z.string().max(2000).nullable(),
+});
+
 export const CommitInputSchema = z.object({
-  statement: DraftStatementSchema,
-  rows: z.array(DraftRowSchema).min(1).max(5000),
+  statement: CommitStatementSchema,
+  rows: z.array(CommitRowSchema).min(1).max(5000),
 });
 
 export type DraftRow = z.infer<typeof DraftRowSchema>;

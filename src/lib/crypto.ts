@@ -133,6 +133,44 @@ export async function unwrapDek(wrapped: WrappedKey, secret: string): Promise<Ui
 
 /* ------------------------------ data encryption ------------------------------ */
 
+/* ------------------------------ merchant tokens ------------------------------ */
+
+/**
+ * Deterministic pseudonyms for merchant grouping: equal merchants map to equal
+ * tokens, so server-side GROUP BY / joins / rule matching keep working over
+ * data whose readable text is encrypted. Derived from the DEK via HKDF so the
+ * token key never needs separate storage or wrapping.
+ */
+export async function importTokenKey(dekBytes: Uint8Array): Promise<CryptoKey> {
+  const hkdfKey = await subtle.importKey("raw", dekBytes as BufferSource, "HKDF", false, [
+    "deriveKey",
+  ]);
+  return subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new Uint8Array(32) as BufferSource,
+      info: new TextEncoder().encode("hishab-merchant-token-v1"),
+    },
+    hkdfKey,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+}
+
+/** 64-hex deterministic token for a normalized merchant string. */
+export async function merchantToken(tokenKey: CryptoKey, merchantNorm: string): Promise<string> {
+  const mac = await subtle.sign(
+    "HMAC",
+    tokenKey,
+    new TextEncoder().encode(merchantNorm) as BufferSource,
+  );
+  return Array.from(new Uint8Array(mac))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 /**
  * Import raw DEK bytes as a usable AES-GCM key. `extractable: false` means
  * even script running in the page can use but never read the key again —

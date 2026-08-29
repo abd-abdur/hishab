@@ -26,7 +26,11 @@ export const recategorizeFn = createServerFn({ method: "POST" })
     const userId = context.userId;
 
     const owned = await db
-      .select({ id: transactions.id, merchantNorm: transactions.merchantNorm })
+      .select({
+        id: transactions.id,
+        merchantNorm: transactions.merchantNorm,
+        merchantDisplay: transactions.merchantDisplay,
+      })
       .from(transactions)
       .where(and(eq(transactions.userId, userId), inArray(transactions.id, data.transactionIds)));
     if (owned.length === 0) return { updated: 0, ruleApplied: 0 };
@@ -59,6 +63,9 @@ export const recategorizeFn = createServerFn({ method: "POST" })
     if (data.createRule) {
       const merchants = [...new Set(owned.map((t) => t.merchantNorm))];
       for (const merchant of merchants) {
+        // For encrypted rows the pattern is an HMAC token; carry a decryptable
+        // display name so the rules list stays readable.
+        const display = owned.find((t) => t.merchantNorm === merchant)?.merchantDisplay ?? null;
         await db
           .insert(categoryRules)
           .values({
@@ -66,11 +73,12 @@ export const recategorizeFn = createServerFn({ method: "POST" })
             userId,
             matchType: "merchant_exact",
             pattern: merchant,
+            patternDisplay: display,
             categoryId: data.categoryId,
           })
           .onConflictDoUpdate({
             target: [categoryRules.userId, categoryRules.matchType, categoryRules.pattern],
-            set: { categoryId: data.categoryId },
+            set: { categoryId: data.categoryId, patternDisplay: display },
           });
       }
       // re-apply to the merchant's other transactions, without overriding manual picks

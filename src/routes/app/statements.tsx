@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2, CircleAlert, FileText, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/app/page-header";
@@ -30,9 +30,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCategoriesFn, getStatementsFn } from "@/lib/app-data.functions";
+import { getCategoriesFn, getRulesFn, getStatementsFn } from "@/lib/app-data.functions";
+import { decryptRows, encryptDraftForCommit, tokenizeMerchant } from "@/lib/enc-data";
 import { useStatementUpload } from "@/lib/extract/use-statement-upload";
 import { commitStatementFn, deleteStatementFn } from "@/lib/ingest/ingest.functions";
+import { getStoredKeys } from "@/lib/key-store";
 import { formatDate, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/statements")({
@@ -43,13 +45,18 @@ const MONTH_TWO_SEEN_KEY = "hishab-month-two-seen";
 
 function StatementsPage() {
   const queryClient = useQueryClient();
+  const session = Route.useRouteContext({ select: (ctx) => ctx.session });
   const { files, addFiles, removeFile, updateDraftRows } = useStatementUpload();
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [monthTwoOpen, setMonthTwoOpen] = useState(false);
 
   const { data: statements, isPending } = useQuery({
-    queryKey: ["statements"],
-    queryFn: () => getStatementsFn(),
+    queryKey: ["statements", session.userId],
+    queryFn: async () => {
+      const rows = await getStatementsFn();
+      const keys = await getStoredKeys(session.userId);
+      return decryptRows(keys, rows, ["fileName", "bankName", "accountNumberMasked"]);
+    },
     staleTime: 30_000,
   });
   const { data: categories } = useQuery({
@@ -110,6 +117,60 @@ function StatementsPage() {
   const handleFiles = (incoming: File[]) => {
     const rejection = addFiles(incoming);
     if (rejection) toast.error(rejection);
+  };
+
+  // Encrypted-era rules store HMAC-token patterns the server can't match
+  // against a plaintext draft, so the rule pass for those happens here, once
+  // per draft, before the user reviews.
+  const { data: rules } = useQuery({
+    queryKey: ["rules"],
+    queryFn: () => getRulesFn(),
+    staleTime: 60_000,
+  });
+  const rulePassDone = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const draft = reviewing?.draft;
+    if (!draft || !rules || rules.length === 0 || rulePassDone.current.has(reviewing.id)) return;
+    rulePassDone.current.add(reviewing.id);
+    void (async () => {
+      const keys = await getStoredKeys(session.userId);
+      if (!keys) return;
+      const byPattern = new Map(
+        rules.filter((r) => r.matchType === "merchant_exact").map((r) => [r.pattern, r.categoryId]),
+      );
+      let changed = false;
+      const rows = await Promise.all(
+        draft.rows.map(async (row) => {
+          if (row.categorySource === "user" || row.categorySource === "rule") return row;
+          const token = await tokenizeMerchant(keys, row.merchantNorm);
+          const categoryId = byPattern.get(token);
+          if (!categoryId || categoryId === row.categoryId) return row;
+          changed = true;
+          return { ...row, categoryId, categorySource: "rule" as const };
+        }),
+      );
+      if (changed) updateDraftRows(reviewing.id, rows);
+    })();
+  }, [reviewing, rules, session.userId, updateDraftRows]);
+
+  const handleCommit = async () => {
+    if (!reviewing?.draft) return;
+    const keys = await getStoredKeys(session.userId);
+    if (!keys) {
+      toast.error(
+        "Your encryption key isn't unlocked in this browser. Sign out and back in, then try again.",
+      );
+      return;
+    }
+    const encrypted = await encryptDraftForCommit(
+      keys,
+      reviewing.draft.statement,
+      reviewing.draft.rows,
+    );
+    commitMutation.mutate({
+      fileId: reviewing.id,
+      data: { statement: encrypted.statement, rows: encrypted.rows },
+    });
   };
 
   return (
@@ -222,15 +283,7 @@ function StatementsPage() {
                 <Button variant="outline" onClick={() => setReviewingId(null)}>
                   Later
                 </Button>
-                <Button
-                  disabled={commitMutation.isPending}
-                  onClick={() =>
-                    commitMutation.mutate({
-                      fileId: reviewing.id,
-                      data: { statement: reviewing.draft!.statement, rows: reviewing.draft!.rows },
-                    })
-                  }
-                >
+                <Button disabled={commitMutation.isPending} onClick={() => void handleCommit()}>
                   {commitMutation.isPending
                     ? "Saving…"
                     : `Add ${reviewing.draft.rows.filter((r) => !r.duplicate).length} transactions`}

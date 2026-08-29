@@ -22,11 +22,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { exportTransactionsFn, getCategoriesFn, getTransactionsFn } from "@/lib/app-data.functions";
+import { getCategoriesFn, getTransactionsFn } from "@/lib/app-data.functions";
 import { recategorizeFn } from "@/lib/app-mutations.functions";
-import { formatMoney } from "@/lib/money";
+import { decryptRows } from "@/lib/enc-data";
+import { getStoredKeys } from "@/lib/key-store";
+import { formatMoney, minorUnitFactor } from "@/lib/money";
 
 const PAGE_SIZE = 200;
+/** Client-side search scans at most this many rows (encrypted text can't be searched in SQL). */
+const SEARCH_SCAN_LIMIT = 3000;
 
 const SearchSchema = z.object({
   q: z.string().optional(),
@@ -46,6 +50,7 @@ function TransactionsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const queryClient = useQueryClient();
+  const session = Route.useRouteContext({ select: (ctx) => ctx.session });
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState("");
   const [createRule, setCreateRule] = useState(true);
@@ -77,12 +82,78 @@ function TransactionsPage() {
     [categories],
   );
 
+  // Search text lives only in the browser once rows are encrypted, so q is
+  // matched here against decrypted rows instead of in SQL.
+  const clientSearch = Boolean(filters.q);
+  const categoryKindById = useMemo(
+    () => new Map((categories ?? []).map((c) => [c.id, c.kind])),
+    [categories],
+  );
+
   const query = useInfiniteQuery({
-    queryKey: ["transactions", filters],
-    queryFn: ({ pageParam }) =>
-      getTransactionsFn({ data: { ...filters, offset: pageParam, limit: PAGE_SIZE } }),
+    queryKey: ["transactions", filters, session.userId],
+    enabled: !clientSearch || categories != null,
+    queryFn: async ({ pageParam }) => {
+      const keys = await getStoredKeys(session.userId);
+      if (!clientSearch) {
+        const page = await getTransactionsFn({
+          data: { ...filters, offset: pageParam, limit: PAGE_SIZE },
+        });
+        return {
+          ...page,
+          rows: await decryptRows(keys, page.rows, ["description", "merchantDisplay"]),
+        };
+      }
+      const { q, ...rest } = filters;
+      const collected: Awaited<ReturnType<typeof getTransactionsFn>>["rows"] = [];
+      let offset = 0;
+      let currency = "AED";
+      while (offset < SEARCH_SCAN_LIMIT) {
+        const page = await getTransactionsFn({ data: { ...rest, offset, limit: 500 } });
+        collected.push(...page.rows);
+        currency = page.currency;
+        offset += page.rows.length;
+        if (page.rows.length === 0 || offset >= page.total) break;
+      }
+      const decrypted = await decryptRows(keys, collected, ["description", "merchantDisplay"]);
+      const needle = (q ?? "").toLowerCase();
+      const rows = decrypted.filter(
+        (r) =>
+          r.description.toLowerCase().includes(needle) ||
+          r.merchantDisplay.toLowerCase().includes(needle),
+      );
+      // mirror the server's kind-split totals for the summary strip
+      let spendMinor = 0;
+      let incomeMinor = 0;
+      let transferOutMinor = 0;
+      let transferInMinor = 0;
+      let transferCount = 0;
+      for (const r of rows) {
+        const kind = categoryKindById.get(r.categoryId) ?? "expense";
+        if (kind === "transfer") {
+          transferCount++;
+          if (r.direction === "debit") transferOutMinor += r.amountMinor;
+          else transferInMinor += r.amountMinor;
+        } else if (kind === "income") {
+          incomeMinor += r.direction === "credit" ? r.amountMinor : -r.amountMinor;
+        } else {
+          spendMinor += r.direction === "debit" ? r.amountMinor : -r.amountMinor;
+        }
+      }
+      return {
+        rows,
+        total: rows.length,
+        spendMinor,
+        incomeMinor,
+        transferOutMinor,
+        transferInMinor,
+        transferCount,
+        currency,
+      };
+    },
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => {
+      if (clientSearch) return undefined;
       const loaded = pages.reduce((sum, p) => sum + p.rows.length, 0);
       return loaded < lastPage.total ? loaded : undefined;
     },
@@ -209,8 +280,45 @@ function TransactionsPage() {
     [queryClient, inlineRecategorize, recategorize, categoriesById, query.data],
   );
 
+  // Export decrypts in the browser — the server can't render readable CSV
+  // from encrypted rows.
   const exportCsv = useMutation({
-    mutationFn: () => exportTransactionsFn({ data: { ...filters, offset: 0, limit: PAGE_SIZE } }),
+    mutationFn: async () => {
+      const keys = await getStoredKeys(session.userId);
+      const { q, ...rest } = filters;
+      const collected: Awaited<ReturnType<typeof getTransactionsFn>>["rows"] = [];
+      let offset = 0;
+      while (offset < 20_000) {
+        const page = await getTransactionsFn({ data: { ...rest, offset, limit: 500 } });
+        collected.push(...page.rows);
+        offset += page.rows.length;
+        if (page.rows.length === 0 || offset >= page.total) break;
+      }
+      let exportRows = await decryptRows(keys, collected, ["description", "merchantDisplay"]);
+      if (q) {
+        const needle = q.toLowerCase();
+        exportRows = exportRows.filter(
+          (r) =>
+            r.description.toLowerCase().includes(needle) ||
+            r.merchantDisplay.toLowerCase().includes(needle),
+        );
+      }
+      const escapeCsv = (value: string) =>
+        /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+      const header = "Date,Description,Merchant,Category,Direction,Amount,Currency";
+      const lines = exportRows.map((r) =>
+        [
+          r.txnDate,
+          escapeCsv(r.description),
+          escapeCsv(r.merchantDisplay),
+          escapeCsv(categoriesById.get(r.categoryId)?.name ?? ""),
+          r.direction,
+          (r.direction === "debit" ? -r.amountMinor : r.amountMinor) / minorUnitFactor(r.currency),
+          r.currency,
+        ].join(","),
+      );
+      return { csv: [header, ...lines].join("\n"), count: exportRows.length };
+    },
     onSuccess: ({ csv, count }) => {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);

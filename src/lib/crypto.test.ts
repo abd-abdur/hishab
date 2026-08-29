@@ -6,6 +6,8 @@ import {
   generateDekBytes,
   generateRecoveryCode,
   importDataKey,
+  importTokenKey,
+  merchantToken,
   normalizeRecoveryCode,
   unwrapDek,
   wrapDek,
@@ -54,6 +56,19 @@ describe("envelope encryption", () => {
       code.replaceAll("-", ""),
     );
     expect(generateRecoveryCode()).not.toEqual(generateRecoveryCode());
+  });
+
+  it("merchant tokens are deterministic per key and differ across keys", async () => {
+    const dekA = generateDekBytes();
+    const dekB = generateDekBytes();
+    const keyA = await importTokenKey(dekA);
+    const keyA2 = await importTokenKey(dekA);
+    const keyB = await importTokenKey(dekB);
+    const t1 = await merchantToken(keyA, "talabat");
+    expect(t1).toMatch(/^[0-9a-f]{64}$/);
+    expect(await merchantToken(keyA2, "talabat")).toBe(t1); // same DEK → same token
+    expect(await merchantToken(keyA, "carrefour")).not.toBe(t1);
+    expect(await merchantToken(keyB, "talabat")).not.toBe(t1); // different user → different token
   });
 
   it("a recovery-code wrap unlocks the same DEK", async () => {

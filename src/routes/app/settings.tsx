@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { getRulesFn } from "@/lib/app-data.functions";
+import { decryptRows } from "@/lib/enc-data";
+import { getStoredKeys } from "@/lib/key-store";
 import { createCategoryFn, deleteRuleFn } from "@/lib/app-mutations.functions";
 import { authErrorMessage, twoFactor, useSession } from "@/lib/auth-client";
 
@@ -41,8 +43,14 @@ function SettingsPage() {
   const session = Route.useRouteContext({ select: (ctx) => ctx.session });
 
   const { data: rules } = useQuery({
-    queryKey: ["rules"],
-    queryFn: () => getRulesFn(),
+    queryKey: ["rules", session.userId],
+    queryFn: async () => {
+      const rows = await getRulesFn();
+      const keys = await getStoredKeys(session.userId);
+      // Encrypted-era rules have a token pattern; show the decrypted name.
+      const withDisplay = await decryptRows(keys, rows, ["patternDisplay"]);
+      return withDisplay.map((r) => ({ ...r, label: r.patternDisplay ?? r.pattern }));
+    },
     staleTime: 60_000,
   });
 
@@ -140,13 +148,13 @@ function SettingsPage() {
               <div className="divide-y">
                 {(rules ?? []).map((rule) => (
                   <div key={rule.id} className="flex items-center gap-3 py-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate font-medium">{rule.pattern}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{rule.label}</span>
                     <span className="text-muted-foreground">→ {rule.categoryName}</span>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => deleteRule.mutate({ data: { ruleId: rule.id } })}
-                      aria-label={`Delete rule for ${rule.pattern}`}
+                      aria-label={`Delete rule for ${rule.label}`}
                     >
                       <Trash2 className="size-4" />
                     </Button>

@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCategoriesFn, getRecurringFn } from "@/lib/app-data.functions";
+import { decryptRows } from "@/lib/enc-data";
+import { getStoredKeys } from "@/lib/key-store";
 import { formatDate, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/recurring")({
@@ -20,9 +22,14 @@ export const Route = createFileRoute("/app/recurring")({
 const MONTHLY_FACTOR = { weekly: 4.35, monthly: 1, yearly: 1 / 12 } as const;
 
 function RecurringPage() {
+  const session = Route.useRouteContext({ select: (ctx) => ctx.session });
   const { data: series, isPending } = useQuery({
-    queryKey: ["recurring"],
-    queryFn: () => getRecurringFn(),
+    queryKey: ["recurring", session.userId],
+    queryFn: async () => {
+      const rows = await getRecurringFn();
+      const keys = await getStoredKeys(session.userId);
+      return decryptRows(keys, rows, ["merchantDisplay"]);
+    },
     staleTime: 60_000,
   });
   const { data: categories } = useQuery({

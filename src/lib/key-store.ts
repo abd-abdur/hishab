@@ -2,6 +2,7 @@ import {
   generateDekBytes,
   generateRecoveryCode,
   importDataKey,
+  importTokenKey,
   normalizeRecoveryCode,
   unwrapDek,
   wrapDek,
@@ -64,10 +65,35 @@ async function idbClear(): Promise<void> {
   db.close();
 }
 
-/** The stored usable data key for this user, if this browser has unlocked one. */
-export async function getStoredDataKey(userId: string): Promise<CryptoKey | null> {
+export type UsableKeys = {
+  /** AES-GCM key for encrypting/decrypting field values */
+  dataKey: CryptoKey;
+  /** HMAC key for deterministic merchant tokens */
+  tokenKey: CryptoKey;
+};
+
+/** Derive both usable keys from raw DEK bytes and persist them (non-extractable). */
+async function storeUsableKeys(userId: string, dekBytes: Uint8Array): Promise<void> {
+  const [dataKey, tokenKey] = await Promise.all([
+    importDataKey(dekBytes),
+    importTokenKey(dekBytes),
+  ]);
+  await idbPut(`dek:${userId}`, dataKey);
+  await idbPut(`tok:${userId}`, tokenKey);
+}
+
+/**
+ * The stored usable keys for this user, or null when this browser hasn't
+ * unlocked them (fresh browser, cleared storage, or a pre-token unlock —
+ * a re-login refreshes both).
+ */
+export async function getStoredKeys(userId: string): Promise<UsableKeys | null> {
   try {
-    return (await idbGet<CryptoKey>(`dek:${userId}`)) ?? null;
+    const [dataKey, tokenKey] = await Promise.all([
+      idbGet<CryptoKey>(`dek:${userId}`),
+      idbGet<CryptoKey>(`tok:${userId}`),
+    ]);
+    return dataKey && tokenKey ? { dataKey, tokenKey } : null;
   } catch {
     return null;
   }
@@ -112,7 +138,7 @@ export async function unlockWithPassword(userId: string, password: string): Prom
         // Raced with another tab that provisioned first; unlock with theirs.
         return unlockWithPassword(userId, password);
       }
-      await idbPut(`dek:${userId}`, await importDataKey(dek));
+      await storeUsableKeys(userId, dek);
       return { status: "created", recoveryCode };
     }
 
@@ -123,7 +149,7 @@ export async function unlockWithPassword(userId: string, password: string): Prom
     } catch {
       return { status: "wrong_secret" };
     }
-    await idbPut(`dek:${userId}`, await importDataKey(dek));
+    await storeUsableKeys(userId, dek);
     return { status: "unlocked" };
   } catch {
     return { status: "error" };
@@ -156,7 +182,7 @@ export async function unlockWithRecoveryCode(
       wrapDek(dek, normalizeRecoveryCode(freshCode)),
     ]);
     await rewrapMyKeysFn({ data: { wrappedDekPassword, wrappedDekRecovery } });
-    await idbPut(`dek:${userId}`, await importDataKey(dek));
+    await storeUsableKeys(userId, dek);
     return { status: "created", recoveryCode: freshCode };
   } catch {
     return { status: "error" };

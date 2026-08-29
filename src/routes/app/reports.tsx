@@ -23,6 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDayTransactionsFn, getReportsFn } from "@/lib/app-data.functions";
+import { decryptRows } from "@/lib/enc-data";
+import { getStoredKeys } from "@/lib/key-store";
 import { formatDateLong, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/reports")({
@@ -54,9 +56,17 @@ function ReportsPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [autoAnchored, setAutoAnchored] = useState(false);
 
+  const session = Route.useRouteContext({ select: (ctx) => ctx.session });
   const { data, isPending } = useQuery({
-    queryKey: ["reports", month],
-    queryFn: () => getReportsFn({ data: { month } }),
+    queryKey: ["reports", month, session.userId],
+    queryFn: async () => {
+      const result = await getReportsFn({ data: { month } });
+      const keys = await getStoredKeys(session.userId);
+      return {
+        ...result,
+        topMerchants: await decryptRows(keys, result.topMerchants, ["merchantDisplay"]),
+      };
+    },
     staleTime: 60_000,
   });
 
@@ -75,8 +85,12 @@ function ReportsPage() {
   }, [autoAnchored, data, month, monthOptions]);
 
   const dayQuery = useQuery({
-    queryKey: ["day", selectedDay],
-    queryFn: () => getDayTransactionsFn({ data: { day: selectedDay as string } }),
+    queryKey: ["day", selectedDay, session.userId],
+    queryFn: async () => {
+      const rows = await getDayTransactionsFn({ data: { day: selectedDay as string } });
+      const keys = await getStoredKeys(session.userId);
+      return decryptRows(keys, rows, ["description", "merchantDisplay"]);
+    },
     enabled: selectedDay != null,
   });
 

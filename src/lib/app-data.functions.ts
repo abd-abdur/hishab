@@ -511,6 +511,7 @@ export const getRulesFn = createServerFn({ method: "GET" })
         id: categoryRules.id,
         matchType: categoryRules.matchType,
         pattern: categoryRules.pattern,
+        patternDisplay: categoryRules.patternDisplay,
         categoryId: categoryRules.categoryId,
         categoryName: categories.name,
       })

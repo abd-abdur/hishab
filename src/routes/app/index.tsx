@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCategoriesFn, getDashboardFn, getInsightsFn } from "@/lib/app-data.functions";
+import { decryptRows } from "@/lib/enc-data";
+import { getStoredKeys } from "@/lib/key-store";
 import { formatDate, formatDateLong, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/")({
@@ -63,9 +65,19 @@ function monthOptions(earliest: string | null): string[] {
 function DashboardPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const { m } = Route.useSearch();
+  const session = Route.useRouteContext({ select: (ctx) => ctx.session });
   const { data, isPending } = useQuery({
-    queryKey: ["dashboard", m ?? "auto"],
-    queryFn: () => getDashboardFn({ data: m ? { month: m } : {} }),
+    queryKey: ["dashboard", m ?? "auto", session.userId],
+    queryFn: async () => {
+      const result = await getDashboardFn({ data: m ? { month: m } : {} });
+      const keys = await getStoredKeys(session.userId);
+      const [recent, upcoming, anomalies] = await Promise.all([
+        decryptRows(keys, result.recent, ["description", "merchantDisplay"]),
+        decryptRows(keys, result.upcoming, ["merchantDisplay"]),
+        decryptRows(keys, result.anomalies, ["merchantDisplay"]),
+      ]);
+      return { ...result, recent, upcoming, anomalies };
+    },
     staleTime: 60_000,
   });
   const { data: categories } = useQuery({

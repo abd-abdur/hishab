@@ -208,6 +208,8 @@ export const categoryRules = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     matchType: text("match_type", { enum: ["merchant_exact", "contains"] }).notNull(),
     pattern: text("pattern").notNull(),
+    /** Encrypted human-readable merchant name; `pattern` is an HMAC token for encrypted-era rules. */
+    patternDisplay: text("pattern_display"),
     categoryId: text("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
