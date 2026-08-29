@@ -1,13 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, MailCheck } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/brand";
+import { RecoveryCodeCard } from "@/components/recovery-code-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authErrorMessage, isExistingAccountError, signUp } from "@/lib/auth-client";
+import { unlockWithPassword } from "@/lib/keys.client";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -19,6 +21,8 @@ function SignupPage() {
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<FormError | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
+  const [verifyNotice, setVerifyNotice] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,20 +34,68 @@ function SignupPage() {
     }
     setFormError(null);
     setPending(true);
-    const { error } = await signUp.email({
+    const { data, error } = await signUp.email({
       name: String(form.get("name")),
       email: String(form.get("email")),
       password,
     });
-    setPending(false);
     if (error) {
+      setPending(false);
       setFormError({
         message: authErrorMessage(error, "Sign up failed. Please try again."),
         existingAccount: isExistingAccountError(error),
       });
       return;
     }
+    // With email verification enforced there is no session yet — the key
+    // ceremony runs at first sign-in instead.
+    if (!data?.token) {
+      setPending(false);
+      setVerifyNotice(true);
+      return;
+    }
+    const unlock = await unlockWithPassword(data.user.id, password);
+    setPending(false);
+    if (unlock.status === "created") {
+      setRecoveryCode(unlock.recoveryCode);
+      return;
+    }
     void navigate({ to: "/app" });
+  }
+
+  if (recoveryCode) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm">
+          <RecoveryCodeCard recoveryCode={recoveryCode} onDone={() => void navigate({ to: "/app" })} />
+        </div>
+      </main>
+    );
+  }
+
+  if (verifyNotice) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MailCheck className="size-5 text-primary" aria-hidden />
+                Check your email
+              </CardTitle>
+              <CardDescription>
+                We've sent a verification link to your email address. Click it, then sign in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/login" className="text-sm font-medium text-primary hover:underline">
+                Go to sign in
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
   }
 
   return (

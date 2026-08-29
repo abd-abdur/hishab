@@ -1,11 +1,19 @@
 import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
+import { clearStoredKeys } from "@/lib/keys.client";
+
 export const authClient = createAuthClient({
   plugins: [twoFactorClient()],
 });
 
-export const { signIn, signUp, signOut, useSession, twoFactor } = authClient;
+export const { signIn, signUp, useSession, twoFactor } = authClient;
+
+/** Sign out and drop this browser's stored encryption key. */
+export const signOut: typeof authClient.signOut = async (...args) => {
+  await clearStoredKeys();
+  return authClient.signOut(...args);
+};
 
 /** Codes returned by the auth API, mapped to messages a person can act on. */
 const AUTH_ERROR_MESSAGES: Record<string, string> = {

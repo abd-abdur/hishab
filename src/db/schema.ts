@@ -81,6 +81,24 @@ export const twoFactor = pgTable("two_factor", {
     .references(() => user.id, { onDelete: "cascade" }),
 });
 
+/**
+ * Zero-knowledge key material: the user's data-encryption key, stored only in
+ * wrapped (encrypted) form — once under the password, once under the one-time
+ * recovery code. The server cannot unwrap either. Losing both secrets makes
+ * the user's encrypted data permanently unreadable, by design.
+ */
+export const userKeys = pgTable("user_keys", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** WrappedKey JSON — DEK wrapped by the password-derived key */
+  wrappedDekPassword: text("wrapped_dek_password").notNull(),
+  /** WrappedKey JSON — DEK wrapped by the recovery-code-derived key */
+  wrappedDekRecovery: text("wrapped_dek_recovery").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 /** better-auth rate-limit counters. Database-backed so limits hold across serverless instances. */
 export const rateLimit = pgTable("rate_limit", {
   id: text("id").primaryKey(),
