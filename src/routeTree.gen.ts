@@ -10,43 +10,184 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AnalyzeRouteImport } from './routes/analyze'
+import { Route as AppRouteRouteImport } from './routes/app/route'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppBudgetsRouteImport } from './routes/app/budgets'
+import { Route as AppRecurringRouteImport } from './routes/app/recurring'
+import { Route as AppReportsRouteImport } from './routes/app/reports'
+import { Route as AppSettingsRouteImport } from './routes/app/settings'
+import { Route as AppStatementsRouteImport } from './routes/app/statements'
+import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AnalyzeRoute = AnalyzeRouteImport.update({
-  id: '/analyze',
-  path: '/analyze',
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBudgetsRoute = AppBudgetsRouteImport.update({
+  id: '/budgets',
+  path: '/budgets',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRecurringRoute = AppRecurringRouteImport.update({
+  id: '/recurring',
+  path: '/recurring',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppStatementsRoute = AppStatementsRouteImport.update({
+  id: '/statements',
+  path: '/statements',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppTransactionsRoute = AppTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/analyze': typeof AnalyzeRoute
+  '/app': typeof AppRouteRouteWithChildren
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/api/ingest': typeof ApiIngestRoute
+  '/app/budgets': typeof AppBudgetsRoute
+  '/app/recurring': typeof AppRecurringRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/statements': typeof AppStatementsRoute
+  '/app/transactions': typeof AppTransactionsRoute
+  '/app/': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/analyze': typeof AnalyzeRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/api/ingest': typeof ApiIngestRoute
+  '/app/budgets': typeof AppBudgetsRoute
+  '/app/recurring': typeof AppRecurringRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/statements': typeof AppStatementsRoute
+  '/app/transactions': typeof AppTransactionsRoute
+  '/app': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/analyze': typeof AnalyzeRoute
+  '/app': typeof AppRouteRouteWithChildren
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/api/ingest': typeof ApiIngestRoute
+  '/app/budgets': typeof AppBudgetsRoute
+  '/app/recurring': typeof AppRecurringRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/statements': typeof AppStatementsRoute
+  '/app/transactions': typeof AppTransactionsRoute
+  '/app/': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analyze'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/signup'
+    | '/api/ingest'
+    | '/app/budgets'
+    | '/app/recurring'
+    | '/app/reports'
+    | '/app/settings'
+    | '/app/statements'
+    | '/app/transactions'
+    | '/app/'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analyze'
-  id: '__root__' | '/' | '/analyze'
+  to:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/api/ingest'
+    | '/app/budgets'
+    | '/app/recurring'
+    | '/app/reports'
+    | '/app/settings'
+    | '/app/statements'
+    | '/app/transactions'
+    | '/app'
+    | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/signup'
+    | '/api/ingest'
+    | '/app/budgets'
+    | '/app/recurring'
+    | '/app/reports'
+    | '/app/settings'
+    | '/app/statements'
+    | '/app/transactions'
+    | '/app/'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AnalyzeRoute: typeof AnalyzeRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
+  ApiIngestRoute: typeof ApiIngestRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,19 +199,124 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/analyze': {
-      id: '/analyze'
-      path: '/analyze'
-      fullPath: '/analyze'
-      preLoaderRoute: typeof AnalyzeRouteImport
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/budgets': {
+      id: '/app/budgets'
+      path: '/budgets'
+      fullPath: '/app/budgets'
+      preLoaderRoute: typeof AppBudgetsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/recurring': {
+      id: '/app/recurring'
+      path: '/recurring'
+      fullPath: '/app/recurring'
+      preLoaderRoute: typeof AppRecurringRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/statements': {
+      id: '/app/statements'
+      path: '/statements'
+      fullPath: '/app/statements'
+      preLoaderRoute: typeof AppStatementsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/transactions': {
+      id: '/app/transactions'
+      path: '/transactions'
+      fullPath: '/app/transactions'
+      preLoaderRoute: typeof AppTransactionsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
+interface AppRouteRouteChildren {
+  AppBudgetsRoute: typeof AppBudgetsRoute
+  AppRecurringRoute: typeof AppRecurringRoute
+  AppReportsRoute: typeof AppReportsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppStatementsRoute: typeof AppStatementsRoute
+  AppTransactionsRoute: typeof AppTransactionsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppBudgetsRoute: AppBudgetsRoute,
+  AppRecurringRoute: AppRecurringRoute,
+  AppReportsRoute: AppReportsRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppStatementsRoute: AppStatementsRoute,
+  AppTransactionsRoute: AppTransactionsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AnalyzeRoute: AnalyzeRoute,
+  AppRouteRoute: AppRouteRouteWithChildren,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
+  ApiIngestRoute: ApiIngestRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

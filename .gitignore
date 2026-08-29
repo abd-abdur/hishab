@@ -16,9 +16,20 @@ dist-ssr
 .nitro
 *.local
 
+# Environment
+.env
+.env.*
+!.env.example
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+
+# Drizzle local
+drizzle/meta/_journal.json.bak
+
+# Vercel
+.vercel
 
 # Editor directories and files
 .vscode/*
@@ -30,3 +41,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.neon

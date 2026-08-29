@@ -5,8 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Fiskal design system — ink-dark fintech with an electric mint accent.
- * All colors are oklch semantic tokens. Never hardcode colors in components.
+ * Hishab design system — ledger green on paper.
+ * Light-default Operate surface: warm paper neutrals, one committed deep green,
+ * semantic money colors. Depth comes from 1px borders and a single shadow tier —
+ * no gradients, no glass, no glow. All colors are oklch semantic tokens;
+ * never hardcode colors in components.
  */
 
 @theme inline {
@@ -15,7 +18,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 10px);
-  --radius-3xl: calc(var(--radius) + 18px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -32,56 +34,139 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+  --color-chart-9: var(--chart-9);
+  --color-chart-10: var(--chart-10);
+  --color-chart-11: var(--chart-11);
+  --color-chart-12: var(--chart-12);
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: var(--shadow-card);
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.17 0.024 260);
-  --foreground: oklch(0.97 0.005 250);
-  --card: oklch(0.22 0.026 260);
-  --card-foreground: oklch(0.97 0.005 250);
-  --popover: oklch(0.22 0.026 260);
-  --popover-foreground: oklch(0.97 0.005 250);
-  --primary: oklch(0.86 0.19 152);
-  --primary-foreground: oklch(0.19 0.04 160);
-  --secondary: oklch(0.28 0.03 260);
-  --secondary-foreground: oklch(0.97 0.005 250);
-  --muted: oklch(0.26 0.026 260);
-  --muted-foreground: oklch(0.72 0.02 258);
-  --accent: oklch(0.78 0.15 210);
-  --accent-foreground: oklch(0.19 0.04 240);
-  --destructive: oklch(0.68 0.19 22);
-  --destructive-foreground: oklch(0.98 0.005 250);
-  --success: oklch(0.82 0.17 152);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.86 0.19 152);
-  --chart-1: oklch(0.86 0.19 152);
-  --chart-2: oklch(0.78 0.15 210);
-  --chart-3: oklch(0.82 0.16 90);
-  --chart-4: oklch(0.72 0.17 340);
-  --chart-5: oklch(0.75 0.15 40);
-  --chart-6: oklch(0.7 0.13 270);
-  --gradient-hero: radial-gradient(
-      120% 90% at 15% 0%,
-      oklch(0.86 0.19 152 / 22%) 0%,
-      transparent 60%
-    ),
-    radial-gradient(90% 70% at 90% 10%, oklch(0.78 0.15 210 / 18%) 0%, transparent 65%);
-  --shadow-glow: 0 24px 80px -30px oklch(0.86 0.19 152 / 45%);
-  --shadow-card: 0 20px 50px -32px oklch(0 0 0 / 80%);
+  --radius: 0.5rem;
+
+  --background: oklch(0.985 0.004 85);
+  --foreground: oklch(0.235 0.012 85);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.235 0.012 85);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.012 85);
+  --primary: oklch(0.42 0.085 165);
+  --primary-foreground: oklch(0.985 0.01 165);
+  --secondary: oklch(0.955 0.006 85);
+  --secondary-foreground: oklch(0.32 0.014 85);
+  --muted: oklch(0.955 0.006 85);
+  --muted-foreground: oklch(0.5 0.014 85);
+  --accent: oklch(0.94 0.02 165);
+  --accent-foreground: oklch(0.32 0.06 165);
+  --destructive: oklch(0.55 0.19 27);
+  --destructive-foreground: oklch(0.985 0.005 27);
+  --border: oklch(0.905 0.008 85);
+  --input: oklch(0.905 0.008 85);
+  --ring: oklch(0.42 0.085 165);
+
+  --sidebar: oklch(0.965 0.005 85);
+  --sidebar-foreground: oklch(0.32 0.014 85);
+  --sidebar-primary: oklch(0.42 0.085 165);
+  --sidebar-primary-foreground: oklch(0.985 0.01 165);
+  --sidebar-accent: oklch(0.93 0.015 165);
+  --sidebar-accent-foreground: oklch(0.3 0.05 165);
+  --sidebar-border: oklch(0.905 0.008 85);
+  --sidebar-ring: oklch(0.42 0.085 165);
+
+  /* money semantics — never reuse chart colors for these */
+  --positive: oklch(0.5 0.11 160);
+  --negative: oklch(0.51 0.16 27);
+  --warning: oklch(0.62 0.13 75);
+
+  /* categorical scale — assigned deterministically per category, persisted */
+  --chart-1: oklch(0.55 0.11 165);
+  --chart-2: oklch(0.55 0.11 245);
+  --chart-3: oklch(0.68 0.13 75);
+  --chart-4: oklch(0.55 0.12 320);
+  --chart-5: oklch(0.6 0.11 195);
+  --chart-6: oklch(0.55 0.13 25);
+  --chart-7: oklch(0.52 0.1 285);
+  --chart-8: oklch(0.62 0.09 130);
+  --chart-9: oklch(0.58 0.1 55);
+  --chart-10: oklch(0.5 0.02 85);
+  --chart-11: oklch(0.65 0.12 350);
+  --chart-12: oklch(0.6 0.12 220);
+
+  --shadow-card: 0 1px 2px oklch(0.235 0.012 85 / 6%), 0 4px 12px -4px oklch(0.235 0.012 85 / 8%);
+}
+
+.dark {
+  --background: oklch(0.185 0.008 85);
+  --foreground: oklch(0.94 0.005 85);
+  --card: oklch(0.225 0.009 85);
+  --card-foreground: oklch(0.94 0.005 85);
+  --popover: oklch(0.225 0.009 85);
+  --popover-foreground: oklch(0.94 0.005 85);
+  --primary: oklch(0.72 0.12 163);
+  --primary-foreground: oklch(0.19 0.04 165);
+  --secondary: oklch(0.27 0.01 85);
+  --secondary-foreground: oklch(0.94 0.005 85);
+  --muted: oklch(0.26 0.01 85);
+  --muted-foreground: oklch(0.68 0.012 85);
+  --accent: oklch(0.29 0.03 165);
+  --accent-foreground: oklch(0.88 0.06 165);
+  --destructive: oklch(0.66 0.17 25);
+  --destructive-foreground: oklch(0.97 0.005 25);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.72 0.12 163);
+
+  --sidebar: oklch(0.21 0.009 85);
+  --sidebar-foreground: oklch(0.88 0.008 85);
+  --sidebar-primary: oklch(0.72 0.12 163);
+  --sidebar-primary-foreground: oklch(0.19 0.04 165);
+  --sidebar-accent: oklch(0.27 0.02 165);
+  --sidebar-accent-foreground: oklch(0.88 0.06 165);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: oklch(0.72 0.12 163);
+
+  --positive: oklch(0.72 0.12 160);
+  --negative: oklch(0.68 0.16 27);
+  --warning: oklch(0.75 0.12 80);
+
+  --chart-1: oklch(0.72 0.11 165);
+  --chart-2: oklch(0.7 0.11 245);
+  --chart-3: oklch(0.78 0.13 80);
+  --chart-4: oklch(0.7 0.13 320);
+  --chart-5: oklch(0.74 0.11 195);
+  --chart-6: oklch(0.7 0.13 30);
+  --chart-7: oklch(0.68 0.1 285);
+  --chart-8: oklch(0.75 0.1 130);
+  --chart-9: oklch(0.72 0.1 60);
+  --chart-10: oklch(0.65 0.015 85);
+  --chart-11: oklch(0.76 0.11 350);
+  --chart-12: oklch(0.72 0.11 220);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 30%);
 }
 
 @layer base {
@@ -95,27 +180,9 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-family: var(--font-display);
-    letter-spacing: -0.02em;
-  }
 }
 
-@utility hero-surface {
-  background-image: var(--gradient-hero);
-}
-
-@utility glass-card {
-  background-color: color-mix(in oklch, var(--card) 82%, transparent);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(10px);
-}
-
-@utility glow {
-  box-shadow: var(--shadow-glow);
+/* Tabular numerals for money and any column of figures. */
+@utility num {
+  font-variant-numeric: tabular-nums;
 }

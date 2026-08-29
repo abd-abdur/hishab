@@ -1,225 +1,233 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  BarChart3,
-  FileText,
-  Layers,
-  Lock,
-  PiggyBank,
-  Sparkles,
-  Upload,
-  Wallet,
-} from "lucide-react";
+import "@fontsource-variable/fraunces";
 
-import { SiteFooter, SiteNav } from "@/components/site-nav";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowRight, CalendarClock, CheckCircle2, FileUp, SlidersHorizontal } from "lucide-react";
+
+import { CategoryDot } from "@/components/app/category-icon";
+import { CategoryBars } from "@/components/charts/category-bars";
+import { SpendSparkline } from "@/components/charts/spend-sparkline";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  DEMO_CATEGORIES,
+  DEMO_MONTH_LABEL,
+  DEMO_RECURRING,
+  DEMO_SPARKLINE,
+  DEMO_TOTALS,
+} from "@/lib/demo-data";
+import { formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Fiskal — AI spending analysis from your bank statement PDF" },
-      {
-        name: "description",
-        content:
-          "Drop in a bank statement PDF and Fiskal's AI turns it into categories, trends, recurring charges and savings tips in seconds.",
-      },
-      {
-        property: "og:title",
-        content: "Fiskal — AI spending analysis from your bank statement PDF",
-      },
-      {
-        property: "og:description",
-        content:
-          "Turn any bank statement PDF into a clear spending dashboard with AI-powered insights.",
-      },
-    ],
-  }),
-  component: Landing,
+  component: LandingPage,
 });
 
-const steps = [
-  {
-    icon: Upload,
-    title: "Upload your statement",
-    body: "Any bank, any layout. Drop in a PDF statement and we read every transaction line on your device.",
-  },
-  {
-    icon: BarChart3,
-    title: "Understand your habits",
-    body: "AI categorises spending, spots recurring charges and charts income against expenses week by week.",
-  },
-  {
-    icon: PiggyBank,
-    title: "Spend stress-free",
-    body: "Get a financial health score plus concrete actions with the money each one could save you monthly.",
-  },
-];
-
-const features = [
-  { icon: Layers, title: "Smart categories", body: "Groceries, rent, transport, subscriptions — grouped automatically with percentage splits." },
-  { icon: Sparkles, title: "Written insights", body: "Plain-English observations about where your money actually goes each month." },
-  { icon: FileText, title: "Recurring detector", body: "Surfaces standing orders and subscriptions quietly draining your account." },
-  { icon: Wallet, title: "Cashflow view", body: "Income versus expenses over the statement period, at a glance." },
-  { icon: PiggyBank, title: "Savings plan", body: "Prioritised recommendations with estimated monthly savings attached." },
-  { icon: Lock, title: "Nothing stored", body: "Text is analysed in the request and never written to a database." },
-];
-
-function Landing() {
+function Wordmark() {
   return (
-    <div className="min-h-screen">
-      <SiteNav />
+    <Link to="/" className="flex items-center gap-2">
+      <span className="flex size-7 items-center justify-center rounded-md bg-primary font-display text-base font-semibold text-primary-foreground">
+        h
+      </span>
+      <span className="font-display text-xl font-semibold tracking-tight">hishab</span>
+    </Link>
+  );
+}
 
-      <main>
-        <section className="hero-surface">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 md:grid-cols-2 md:py-28">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1 text-xs text-muted-foreground">
-                <Sparkles className="size-3.5 text-primary" /> Powered by Gemini
+function DashboardPreview() {
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <div className="text-sm text-muted-foreground">{DEMO_MONTH_LABEL} spend</div>
+          <div className="num mt-0.5 text-3xl font-semibold tracking-tight">
+            {formatMoney(DEMO_TOTALS.spendToDateMinor)}
+          </div>
+          <div className="mt-0.5 text-sm text-positive">
+            {DEMO_TOTALS.paceVsPrevPct}% vs July at this point
+          </div>
+        </div>
+        <div className="text-right text-sm">
+          <div className="text-muted-foreground">Budgets</div>
+          <div className="mt-0.5 font-medium">
+            On track: {DEMO_TOTALS.budgetsOnTrack} of {DEMO_TOTALS.budgetsTotal}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2">
+        <SpendSparkline data={[...DEMO_SPARKLINE]} />
+      </div>
+      <div className="mt-5">
+        <CategoryBars data={[...DEMO_CATEGORIES]} />
+      </div>
+      <div className="mt-5 border-t pt-4">
+        <div className="mb-2 text-sm font-medium">Recurring next up</div>
+        <div className="space-y-2">
+          {DEMO_RECURRING.map((item) => (
+            <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex items-center gap-2">
+                {item.merchant}
+                {item.priceChange ? (
+                  <Badge variant="outline" className="text-[10px] text-warning">
+                    price change
+                  </Badge>
+                ) : null}
               </span>
-              <h1 className="mt-5 text-5xl font-bold leading-[1.05] md:text-6xl">
-                The only app that gets your money into shape
-              </h1>
-              <p className="mt-5 max-w-md text-lg text-muted-foreground">
-                Upload a bank statement PDF and get a full spending analysis — categories,
-                trends, recurring charges and where to cut back.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Button asChild size="lg">
-                  <Link to="/analyze">
-                    Analyze my statement <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="secondary">
-                  <a href="#how">See how it works</a>
-                </Button>
-              </div>
-              <p className="mt-4 text-xs text-muted-foreground">
-                No signup. No bank login. Just your PDF.
-              </p>
+              <span className="text-muted-foreground">
+                {item.nextDate} · <span className="num">{formatMoney(item.amountMinor)}</span>
+              </span>
             </div>
-
-            <Card className="glass-card glow rounded-3xl p-6">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                    Total expenses
-                  </p>
-                  <p className="font-display text-4xl font-bold">-1 574</p>
-                </div>
-                <span className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary">
-                  Dec 1 – Dec 31
-                </span>
-              </div>
-              <div className="mt-6 space-y-3">
-                {[
-                  ["Rent & housing", 24, "-620"],
-                  ["Groceries", 22, "-346"],
-                  ["Transport", 20, "-315"],
-                  ["Dining", 15, "-236"],
-                  ["Subscriptions", 13, "-57"],
-                ].map(([label, pct, amount]) => (
-                  <div key={label as string}>
-                    <div className="flex justify-between text-sm">
-                      <span>{label}</span>
-                      <span className="text-muted-foreground">{amount} USD</span>
-                    </div>
-                    <div className="mt-1.5 h-2 rounded-full bg-secondary">
-                      <div
-                        className="h-2 rounded-full bg-primary"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-secondary/60 p-3">
-                  <p className="text-xs text-muted-foreground">Avg. daily spend</p>
-                  <p className="font-display text-xl font-semibold">-50.7</p>
-                </div>
-                <div className="rounded-xl bg-secondary/60 p-3">
-                  <p className="text-xs text-muted-foreground">Busiest day</p>
-                  <p className="font-display text-xl font-semibold">Thursday</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </section>
-
-        <section id="how" className="mx-auto max-w-6xl px-5 py-20">
-          <h2 className="max-w-lg text-4xl font-bold">
-            How to get your money into shape?
-          </h2>
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
-            {steps.map((step, i) => (
-              <Card key={step.title} className="glass-card rounded-2xl p-6">
-                <span className="text-xs uppercase tracking-widest text-primary">
-                  Step {i + 1}
-                </span>
-                <step.icon className="mt-4 size-6 text-primary" />
-                <h3 className="mt-3 text-xl font-semibold">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section id="features" className="border-y border-border/60 bg-card/30 py-20">
-          <div className="mx-auto max-w-6xl px-5">
-            <h2 className="text-4xl font-bold">Features people love</h2>
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {features.map((f) => (
-                <div key={f.title} className="rounded-2xl border border-border p-6">
-                  <f.icon className="size-5 text-primary" />
-                  <h3 className="mt-3 text-lg font-semibold">{f.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{f.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="faq" className="mx-auto max-w-3xl px-5 py-20">
-          <h2 className="text-4xl font-bold">Questions</h2>
-          <Accordion type="single" collapsible className="mt-8">
-            <AccordionItem value="a">
-              <AccordionTrigger>Which banks are supported?</AccordionTrigger>
-              <AccordionContent>
-                Any bank. Fiskal reads the text of the PDF itself rather than connecting
-                to your bank, so any text-based statement works.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="b">
-              <AccordionTrigger>Is my statement stored?</AccordionTrigger>
-              <AccordionContent>
-                No. The PDF is read in your browser and only the extracted text is sent for
-                analysis. Nothing is written to a database.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="c">
-              <AccordionTrigger>What about scanned statements?</AccordionTrigger>
-              <AccordionContent>
-                Scanned image-only PDFs contain no selectable text, so export a digital
-                statement from your banking app for best results.
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-          <Button asChild size="lg" className="mt-10">
-            <Link to="/analyze">
-              Analyze my statement <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </section>
-      </main>
-
-      <SiteFooter />
+          ))}
+        </div>
+      </div>
     </div>
+  );
+}
+
+const TRUTHS = [
+  {
+    icon: CheckCircle2,
+    title: "You approve every row",
+    body: "Statements are transcribed into individual transactions and shown to you first — editable, with duplicates flagged. Where a statement prints balances, Hishab checks that the rows add up to the fils and tells you when they don't.",
+  },
+  {
+    icon: CalendarClock,
+    title: "Subscriptions can't hide",
+    body: "Recurring charges are detected from your actual history — cadence, next expected date, and price rises like a streaming plan quietly going from AED 39 to AED 45.",
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "Budgets with an honest pace",
+    body: 'Set a monthly limit per category and see a projection from your real pace — "on track to hit AED 1,860 of 2,000" — always labeled with how far your data actually goes.',
+  },
+];
+
+const FAQS = [
+  {
+    q: "Which banks and formats work?",
+    a: "Any bank. Hishab reads the statement itself — text PDFs, scanned pages, photos, CSV and Excel exports — rather than connecting to your bank. Up to 10 files at a time.",
+  },
+  {
+    q: "What about currencies other than AED?",
+    a: "The currency printed on each statement is respected. AED is the first-class default, with proper formatting for dirhams and fils.",
+  },
+  {
+    q: "How accurate are the numbers?",
+    a: "Transactions are transcribed row by row, then every total is computed arithmetic — nothing is estimated. When a statement prints opening and closing balances, Hishab reconciles against them and shows a verified badge (or an honest warning).",
+  },
+  {
+    q: "What happens to my data?",
+    a: "Your transactions are stored in your account so budgets and trends work across months and devices. Export everything as CSV or delete any statement — and its transactions — whenever you like. No bank logins, ever.",
+  },
+];
+
+function LandingPage() {
+  return (
+    <main className="min-h-screen bg-background">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+        <Wordmark />
+        <nav className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/login">Sign in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link to="/signup">Start free</Link>
+          </Button>
+        </nav>
+      </header>
+
+      {/* Hero */}
+      <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:py-20">
+        <div>
+          <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            Your statements, finally legible.
+          </h1>
+          <p className="mt-4 max-w-md text-lg text-muted-foreground">
+            Upload a bank statement — PDF, a photo of a page, CSV or Excel. Hishab turns it into
+            searchable transactions, budgets and trends. Built for AED.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Button asChild size="lg">
+              <Link to="/signup">
+                Start free
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link to="/login">Sign in</Link>
+            </Button>
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            No bank logins. Every row reviewed by you before it counts.
+          </p>
+        </div>
+        <DashboardPreview />
+      </section>
+
+      {/* Three product truths */}
+      <section className="border-t bg-card/50">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
+          {TRUTHS.map((truth) => (
+            <div key={truth.title}>
+              <truth.icon className="size-5 text-primary" aria-hidden />
+              <h2 className="mt-3 font-display text-xl font-semibold tracking-tight">
+                {truth.title}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{truth.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Data honesty */}
+      <section className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+        <h2 className="font-display text-2xl font-semibold tracking-tight">
+          Straight answers about your data
+        </h2>
+        <div className="mt-4 space-y-3 text-[15px] leading-relaxed text-muted-foreground">
+          <p>
+            What's stored: the transactions you approve, in your account, so months compare and
+            budgets carry over. All of it is exportable as CSV and deletable statement by statement.
+          </p>
+          <p>
+            What's not: your bank credentials — Hishab never connects to your bank. Files you upload
+            are processed to extract transactions and are not kept as documents. Your data is not
+            sold or shared.
+          </p>
+          <p>
+            Categorization is automatic and correctable — fix a merchant once and Hishab remembers
+            your choice for every future statement.
+          </p>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="border-t">
+        <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+          <h2 className="font-display text-2xl font-semibold tracking-tight">Questions</h2>
+          <dl className="mt-6 space-y-6">
+            {FAQS.map((faq) => (
+              <div key={faq.q}>
+                <dt className="text-[15px] font-medium">{faq.q}</dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{faq.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:px-6">
+          <div className="flex items-center gap-2">
+            <span className="flex size-5 items-center justify-center rounded bg-primary font-display text-xs font-semibold text-primary-foreground">
+              h
+            </span>
+            hishab — every dirham, accounted for
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CategoryDot color="chart-1" />
+            Built for AED
+          </div>
+        </div>
+      </footer>
+    </main>
   );
 }
