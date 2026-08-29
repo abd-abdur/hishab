@@ -149,6 +149,63 @@ describe("verifyStatement", () => {
     expect(result.reconciliationDeltaMinor).toBe(-10000);
   });
 
+  it("discards a fake balance column that mirrors each row's own amount", () => {
+    // card statements often print original amount + billing amount; the
+    // second column is not a running balance
+    const result = verifyStatement(
+      batch({ openingBalance: 0, closingBalance: -350 }, [
+        {
+          date: "01/08/2026",
+          description: "TABBY",
+          amount: 100,
+          direction: "debit",
+          runningBalance: -100,
+        },
+        {
+          date: "02/08/2026",
+          description: "TALABAT",
+          amount: 150,
+          direction: "debit",
+          runningBalance: -150,
+        },
+        {
+          date: "03/08/2026",
+          description: "DEWA",
+          amount: 100,
+          direction: "debit",
+          runningBalance: -100,
+        },
+      ]),
+    );
+    expect(result.transactions.every((t) => t.runningBalanceMinor === null)).toBe(true);
+    expect(result.reconciliationStatus).toBe("reconciled");
+    expect(result.transactions.every((t) => t.confidence === 1)).toBe(true);
+  });
+
+  it("replaces a period that doesn't overlap the transactions with the row span", () => {
+    // statement date + payment due date misread as the period
+    const result = verifyStatement(
+      batch({ periodStart: "14/08/2026", periodEnd: "30/08/2026" }, [
+        {
+          date: "13/07/2026",
+          description: "A",
+          amount: 10,
+          direction: "debit",
+          runningBalance: null,
+        },
+        {
+          date: "10/08/2026",
+          description: "B",
+          amount: 10,
+          direction: "debit",
+          runningBalance: null,
+        },
+      ]),
+    );
+    expect(result.periodStart).toBe("2026-07-13");
+    expect(result.periodEnd).toBe("2026-08-10");
+  });
+
   it("flags a mismatch with the exact delta", () => {
     const result = verifyStatement(
       batch({ openingBalance: 1000, closingBalance: 1200 }, [

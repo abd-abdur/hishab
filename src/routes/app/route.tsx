@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandMenu } from "@/components/app/command-menu";
+import { IdleLogout } from "@/components/app/idle-logout";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSessionFn } from "@/lib/auth-middleware";
 
@@ -25,6 +26,7 @@ function AppLayout() {
         <Outlet />
       </SidebarInset>
       <CommandMenu />
+      <IdleLogout />
     </SidebarProvider>
   );
 }

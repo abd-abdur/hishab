@@ -97,12 +97,20 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     sortOrder: 11,
   },
   {
+    slug: "bnpl",
+    name: "BNPL",
+    icon: "credit-card",
+    color: "chart-12",
+    kind: "expense",
+    sortOrder: 12,
+  },
+  {
     slug: "fees",
     name: "Fees & Charges",
     icon: "receipt",
     color: "chart-10",
     kind: "expense",
-    sortOrder: 12,
+    sortOrder: 13,
   },
   {
     slug: "transfers",

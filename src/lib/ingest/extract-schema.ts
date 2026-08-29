@@ -42,10 +42,12 @@ Rules — follow them exactly:
 - Every transaction row in the input must appear exactly once in the output. Do not skip small rows, reversals, fees, or VAT lines.
 - "date" is the transaction date string exactly as printed (prefer the transaction/posting date column if both exist).
 - "amount" is the absolute value of the money moved in that row. Strip currency symbols and thousands separators.
+- Card statements often print TWO amounts per row: the original-currency amount and the amount billed in the statement's currency (e.g. "CAD -20.00 | -54.69" on an AED statement). "amount" is ALWAYS the statement-currency (billing) amount — the rightmost amount column.
 - "direction": "debit" when money leaves the account (withdrawals, purchases, fees), "credit" when money arrives (salary, deposits, refunds).
 - Statements often print debit and credit in separate columns, or mark debits with DR/minus. Use the layout to decide direction.
-- "runningBalance": the balance printed on that row, or null when the statement has no balance column.
+- "runningBalance": the balance printed on that row, ONLY if the statement has a true cumulative balance column (each row's balance builds on the previous row's). A second amount column that merely repeats the row's own amount is NOT a balance — output null for every row in that case.
 - Statement metadata (bankName, currency, balances, period): only what is actually printed on these pages; null when absent. Never guess a currency.
+- periodStart/periodEnd are the span of transactions the statement covers. A statement issue date or a payment due date is NOT the period — output null rather than those.
 - openingBalance / closingBalance: only if explicitly printed (e.g. "Opening balance", "Balance brought forward"). The first/last row's running balance is NOT an opening/closing balance.
 - Non-transaction lines (headers, footers, page numbers, marketing) are ignored.
 - Column separators: the text uses " | " between columns where the original layout had table columns.`;

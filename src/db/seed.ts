@@ -46,6 +46,11 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["UDRIVE", "Udrive", "transport"],
   ["PARKIN", "Parkin", "transport"],
   ["MAWAQIF", "Mawaqif", "transport"],
+  // Buy now, pay later
+  ["TABBY", "Tabby", "bnpl"],
+  ["TAMARA", "Tamara", "bnpl"],
+  ["POSTPAY", "Postpay", "bnpl"],
+  ["CASHEW", "Cashew", "bnpl"],
   // Fuel
   ["ADNOC", "ADNOC", "fuel"],
   ["ENOC", "ENOC", "fuel"],
@@ -145,7 +150,10 @@ async function main() {
         kind: cat.kind,
         sortOrder: cat.sortOrder,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: categories.id,
+        set: { name: cat.name, icon: cat.icon, color: cat.color, sortOrder: cat.sortOrder },
+      });
   }
   console.log(`Seeded ${SYSTEM_CATEGORIES.length} system categories`);
 

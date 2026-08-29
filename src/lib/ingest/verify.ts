@@ -147,15 +147,41 @@ export function verifyStatement(batch: ExtractBatch): VerifiedStatement {
     meta.dateFormatGuess,
   );
 
-  const periodStart = meta.periodStart
+  let periodStart = meta.periodStart
     ? datePartsToDate(parseDateToken(meta.periodStart, order))
     : null;
-  const periodEnd = meta.periodEnd ? datePartsToDate(parseDateToken(meta.periodEnd, order)) : null;
+  let periodEnd = meta.periodEnd ? datePartsToDate(parseDateToken(meta.periodEnd, order)) : null;
 
   const transactions: VerifiedTransaction[] = [];
   for (const raw of batch.transactions) {
     const verified = verifyRow(raw, order, factor, periodStart, periodEnd);
     if (verified) transactions.push(verified);
+  }
+
+  // A period that doesn't overlap the transactions is a misread (statement
+  // issue date, payment due date). Trust the rows instead.
+  if (transactions.length > 0 && periodStart && periodEnd) {
+    const dates = transactions.map((t) => t.txnDate).sort();
+    const minDate = dates[0] as string;
+    const maxDate = dates[dates.length - 1] as string;
+    if (toISODate(periodStart) > maxDate || toISODate(periodEnd) < minDate) {
+      periodStart = null;
+      periodEnd = null;
+    }
+  }
+
+  // Some card statements print a second amount column (the billing amount)
+  // that the model can mistake for a running balance. A real balance column
+  // accumulates; a fake one just mirrors each row's own amount. When most
+  // "balances" equal ±their own row's amount, discard them all.
+  const withBalance = transactions.filter((t) => t.runningBalanceMinor != null);
+  if (withBalance.length >= 3) {
+    const mirrored = withBalance.filter(
+      (t) => Math.abs(t.runningBalanceMinor ?? 0) === t.amountMinor,
+    ).length;
+    if (mirrored / withBalance.length > 0.6) {
+      for (const t of transactions) t.runningBalanceMinor = null;
+    }
   }
 
   // Statement polarity: a bank balance falls when money leaves; a credit-card
@@ -228,8 +254,16 @@ export function verifyStatement(batch: ExtractBatch): VerifiedStatement {
     bankName: meta.bankName,
     currency,
     accountNumberMasked: meta.accountNumberMasked,
-    periodStart: periodStart ? toISODate(periodStart) : null,
-    periodEnd: periodEnd ? toISODate(periodEnd) : null,
+    // fall back to the transactions' own span when no period is printed
+    periodStart: periodStart
+      ? toISODate(periodStart)
+      : (transactions.map((t) => t.txnDate).sort()[0] ?? null),
+    periodEnd: periodEnd
+      ? toISODate(periodEnd)
+      : (transactions
+          .map((t) => t.txnDate)
+          .sort()
+          .at(-1) ?? null),
     openingBalanceMinor: openingMinor,
     closingBalanceMinor: closingMinor,
     reconciliationStatus,
