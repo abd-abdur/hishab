@@ -1,15 +1,43 @@
+import nodemailer, { type Transporter } from "nodemailer";
+
 /**
- * Transactional email via the Resend HTTP API — no SDK dependency.
+ * Transactional email, in order of preference:
  *
- * Configured with RESEND_API_KEY and EMAIL_FROM (e.g. "Hishab <no-reply@yourdomain.com>").
- * When RESEND_API_KEY is absent (local dev), emails are not sent; callers decide
- * their own fallback. `isEmailConfigured` lets auth require verification only
- * when we can actually deliver the verification mail.
+ * 1. Resend HTTP API — RESEND_API_KEY + EMAIL_FROM ("Hishab <no-reply@yourdomain.com>").
+ *    The production path once a sending domain is verified.
+ * 2. SMTP — SMTP_USER + SMTP_PASS (defaults to Gmail: an address + app password).
+ *    Free, domain-less; fine for beta. SMTP_HOST/SMTP_PORT override the Gmail
+ *    defaults, EMAIL_FROM overrides the visible sender.
+ * 3. Neither configured: the mail is printed to the server console (dev).
+ *
+ * `isEmailConfigured` gates the auth flows that must not switch on until
+ * delivery actually works (e.g. requiring email verification to sign in).
  */
 
-export function isEmailConfigured(): boolean {
-  return Boolean(process.env["RESEND_API_KEY"] && process.env["EMAIL_FROM"]);
+function resendConfig() {
+  const apiKey = process.env["RESEND_API_KEY"];
+  const from = process.env["EMAIL_FROM"];
+  return apiKey && from ? { apiKey, from } : null;
 }
+
+function smtpConfig() {
+  const user = process.env["SMTP_USER"];
+  const pass = process.env["SMTP_PASS"];
+  if (!user || !pass) return null;
+  return {
+    host: process.env["SMTP_HOST"] ?? "smtp.gmail.com",
+    port: Number(process.env["SMTP_PORT"] ?? 465),
+    user,
+    pass,
+    from: process.env["EMAIL_FROM"] ?? `Hishab <${user}>`,
+  };
+}
+
+export function isEmailConfigured(): boolean {
+  return Boolean(resendConfig() ?? smtpConfig());
+}
+
+let transporter: Transporter | null = null;
 
 export async function sendEmail(options: {
   to: string;
@@ -17,33 +45,51 @@ export async function sendEmail(options: {
   html: string;
   text: string;
 }): Promise<void> {
-  const apiKey = process.env["RESEND_API_KEY"];
-  const from = process.env["EMAIL_FROM"];
-  if (!apiKey || !from) {
-    // Dev fallback: surface the mail on the server console. Never log message
-    // bodies in production — this branch is unreachable there because
-    // production requires email to be configured.
-    console.info(`[email:dev] to=${options.to} subject=${options.subject}\n${options.text}`);
+  const resend = resendConfig();
+  if (resend) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${resend.apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        from: resend.from,
+        to: [options.to],
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      }),
+    });
+    if (!response.ok) {
+      // Log status only — the body can echo recipient addresses.
+      throw new Error(`Email send failed with status ${response.status}`);
+    }
     return;
   }
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [options.to],
+
+  const smtp = smtpConfig();
+  if (smtp) {
+    transporter ??= nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      auth: { user: smtp.user, pass: smtp.pass },
+    });
+    await transporter.sendMail({
+      from: smtp.from,
+      to: options.to,
       subject: options.subject,
       html: options.html,
       text: options.text,
-    }),
-  });
-  if (!response.ok) {
-    // Log status only — the body can echo recipient addresses.
-    throw new Error(`Email send failed with status ${response.status}`);
+    });
+    return;
   }
+
+  // Dev fallback: surface the mail on the server console. Never log message
+  // bodies in production — this branch is unreachable there because
+  // production requires email to be configured.
+  console.info(`[email:dev] to=${options.to} subject=${options.subject}\n${options.text}`);
 }
 
 export function verificationEmail(name: string, url: string): {
