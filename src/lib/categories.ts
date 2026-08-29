@@ -113,12 +113,30 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     sortOrder: 13,
   },
   {
+    // money sent to OTHER people — spending, unlike own-account transfers
+    slug: "p2p-out",
+    name: "Sent to People",
+    icon: "send",
+    color: "chart-2",
+    kind: "expense",
+    sortOrder: 14,
+  },
+  {
     slug: "transfers",
     name: "Transfers",
     icon: "arrow-left-right",
     color: "chart-10",
     kind: "transfer",
-    sortOrder: 13,
+    sortOrder: 15,
+  },
+  {
+    // money received from OTHER people — income, unlike own-account transfers
+    slug: "p2p-in",
+    name: "Received from People",
+    icon: "hand-coins",
+    color: "chart-8",
+    kind: "income",
+    sortOrder: 16,
   },
   {
     slug: "income",
@@ -126,7 +144,7 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     icon: "banknote",
     color: "chart-1",
     kind: "income",
-    sortOrder: 14,
+    sortOrder: 17,
   },
   {
     slug: "uncategorized",
@@ -134,7 +152,7 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     icon: "circle-dashed",
     color: "chart-10",
     kind: "expense",
-    sortOrder: 15,
+    sortOrder: 18,
   },
 ];
 

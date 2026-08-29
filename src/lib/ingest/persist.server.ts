@@ -65,6 +65,7 @@ export async function commitStatement(userId: string, input: CommitInput): Promi
     .set({ transactionCount: insertedCount, duplicateCount: skipped })
     .where(eq(statements.id, statementId));
 
+  await reclassifyMatchedTransfers(userId);
   await refreshRecurringSeries(userId);
   await refreshAnomalyFlags(userId);
 
@@ -158,6 +159,32 @@ async function refreshAnomalyFlags(userId: string): Promise<void> {
         AND m.sample_count >= 4
         AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
         false
+      )
+  `);
+}
+
+/**
+ * A person-to-person row with an opposite-direction twin in another statement
+ * (same amount, ±3 days) is really an own-account move seen from both sides —
+ * name matching can miss a nickname, but a matched pair never lies. Flip such
+ * rows to Transfers unless the user categorized them by hand.
+ */
+export async function reclassifyMatchedTransfers(userId: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE transactions t
+    SET category_id = 'sys_transfers', category_source = 'dictionary'
+    FROM categories c
+    WHERE c.id = t.category_id
+      AND t.user_id = ${userId}
+      AND c.slug IN ('p2p-out', 'p2p-in')
+      AND t.category_source != 'user'
+      AND EXISTS (
+        SELECT 1 FROM transactions b
+        WHERE b.user_id = t.user_id
+          AND b.amount_minor = t.amount_minor
+          AND b.direction != t.direction
+          AND b.statement_id != t.statement_id
+          AND abs(b.txn_date - t.txn_date) <= 3
       )
   `);
 }

@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db/client";
-import { categories, categoryRules, merchantDictionary } from "@/db/schema";
+import { categories, categoryRules, merchantDictionary, user } from "@/db/schema";
 import {
   categorizationModel,
   minimalThinking,
@@ -33,6 +33,33 @@ export async function loadCategoriesForUser(userId: string): Promise<CategoryRow
     .where(or(isNull(categories.userId), eq(categories.userId, userId)));
 }
 
+/**
+ * Deterministic person-to-person classification for "TO <name>" / "FROM
+ * <name>" transfer rows. A counterparty sharing a name token with the account
+ * holder is the holder's own account (a transfer); anyone else is real money
+ * leaving or arriving — spending or income.
+ */
+export function classifyP2P(
+  merchantNorm: string,
+  holderTokens: Set<string>,
+): "self" | "out" | "in" | null {
+  const match = merchantNorm.match(/^(TO|FROM)\s+(.+)$/);
+  if (!match) return null;
+  const counterparty = (match[2] ?? "").split(/[^A-Z]+/).filter((w) => w.length >= 3);
+  const isSelf = counterparty.some((token) => holderTokens.has(token));
+  if (isSelf) return "self";
+  return match[1] === "TO" ? "out" : "in";
+}
+
+export function holderNameTokens(name: string): Set<string> {
+  return new Set(
+    name
+      .toUpperCase()
+      .split(/[^A-Z]+/)
+      .filter((w) => w.length >= 3),
+  );
+}
+
 export async function categorizeTransactions(
   userId: string,
   transactions: VerifiedTransaction[],
@@ -41,6 +68,9 @@ export async function categorizeTransactions(
   const bySlug = new Map(categoryRows.map((c) => [c.slug, c.id]));
   const validIds = new Set(categoryRows.map((c) => c.id));
   const uncategorizedId = bySlug.get("uncategorized") ?? categoryRows[0]?.id ?? "sys_uncategorized";
+
+  const [holder] = await db.select({ name: user.name }).from(user).where(eq(user.id, userId));
+  const holderTokens = holderNameTokens(holder?.name ?? "");
 
   const rules = await db.select().from(categoryRules).where(eq(categoryRules.userId, userId));
   const exactRules = new Map(
@@ -79,6 +109,16 @@ export async function categorizeTransactions(
     if (ruleCategory && validIds.has(ruleCategory)) {
       resolved.set(merchant, { categoryId: ruleCategory, source: "rule" });
       continue;
+    }
+    // person-to-person rows are decided deterministically, never by the model
+    const p2p = classifyP2P(merchant, holderTokens);
+    if (p2p) {
+      const slug = p2p === "self" ? "transfers" : p2p === "out" ? "p2p-out" : "p2p-in";
+      const categoryId = bySlug.get(slug);
+      if (categoryId) {
+        resolved.set(merchant, { categoryId, source: "dictionary" });
+        continue;
+      }
     }
     const dict = dictionary.get(merchant) ?? matchDictionaryPrefix(dictRows, merchant);
     if (dict) {
@@ -171,7 +211,7 @@ async function categorizeUnknownMerchants(
         model: categorizationModel(),
         schema,
         system: `Assign each merchant to exactly one category slug from this list: ${slugs.join(", ")}.
-Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
+Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". Money clearly sent to another person is "p2p-out"; money clearly received from another person is "p2p-in". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
         prompt: JSON.stringify(input),
         providerOptions: minimalThinking,
         abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
