@@ -273,20 +273,22 @@ export const getTransactionsFn = createServerFn({ method: "GET" })
           isAnomaly: transactions.isAnomaly,
           statementId: transactions.statementId,
           // an internal move seen from both accounts: this transfer row has an
-          // opposite-direction twin (same amount, ±3 days) in another statement
+          // opposite-direction twin (same amount, ±3 days) in another statement.
+          // Columns are qualified by hand — drizzle renders bare identifiers
+          // here, which are ambiguous inside the correlated subquery.
           matchedTransfer: sql<boolean>`(
             exists (
               select 1 from categories ca
-              where ca.id = ${transactions.categoryId} and ca.kind = 'transfer'
+              where ca.id = "transactions"."category_id" and ca.kind = 'transfer'
             )
             and exists (
               select 1 from transactions b
               join categories cb on cb.id = b.category_id
-              where b.user_id = ${transactions.userId}
-                and b.amount_minor = ${transactions.amountMinor}
-                and b.direction != ${transactions.direction}
-                and b.statement_id != ${transactions.statementId}
-                and abs(b.txn_date - ${transactions.txnDate}) <= 3
+              where b.user_id = "transactions"."user_id"
+                and b.amount_minor = "transactions"."amount_minor"
+                and b.direction != "transactions"."direction"
+                and b.statement_id != "transactions"."statement_id"
+                and abs(b.txn_date - "transactions"."txn_date") <= 3
                 and cb.kind = 'transfer'
             )
           )`,

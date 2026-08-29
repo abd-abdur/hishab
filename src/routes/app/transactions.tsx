@@ -362,6 +362,16 @@ function TransactionsPage() {
 
         {query.isPending ? (
           <Skeleton className="h-96" />
+        ) : query.isError ? (
+          <EmptyState
+            icon={ArrowLeftRight}
+            title="Couldn't load your transactions"
+            description="Something went wrong on our end — your data is safe. Try again in a moment."
+          >
+            <Button variant="outline" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </EmptyState>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}
