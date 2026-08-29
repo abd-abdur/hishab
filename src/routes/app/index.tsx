@@ -28,15 +28,13 @@ import { formatDate, formatDateLong, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/")({
   validateSearch: z.object({
-    m: z
-      .string()
-      .regex(/^\d{4}-\d{2}$/)
-      .optional(),
+    m: z.union([z.literal("all"), z.string().regex(/^\d{4}-\d{2}$/)]).optional(),
   }),
   component: DashboardPage,
 });
 
 function monthName(month: string): string {
+  if (month === "all") return "all time";
   const [year, m] = month.split("-");
   return new Date(Number(year), Number(m) - 1, 1).toLocaleDateString("en-AE", { month: "long" });
 }
@@ -83,7 +81,7 @@ function DashboardPage() {
   const { data: insightsData } = useQuery({
     queryKey: ["insights", data?.month],
     queryFn: () => getInsightsFn({ data: { month: data?.month as string } }),
-    enabled: Boolean(data && data.freshness.transactionCount > 0),
+    enabled: Boolean(data && data.freshness.transactionCount > 0 && data.month !== "all"),
     staleTime: 300_000,
   });
   const insights = insightsData?.insights ?? [];
@@ -139,25 +137,29 @@ function DashboardPage() {
           100,
       )
     : null;
-  const spendDetail =
-    pace.spendToDateMinor === 0 && pace.thisCoverage < 0.05 ? (
-      <span>No statements cover {monthName(data.month)} yet</span>
-    ) : prevComparable ? (
-      <span className={(paceDelta ?? 0) > 0 ? "text-negative" : "text-positive"}>
-        {(paceDelta ?? 0) > 0 ? "+" : ""}
-        {paceDelta}% vs {monthName(pace.prevMonth)}
-        {data.isCurrentMonth ? " at this point" : ""}
-      </span>
-    ) : pace.prevSpendSamePointMinor > 0 ? (
-      <span>
-        {monthName(pace.prevMonth)} data is partial ({Math.round(pace.prevCoverage * 100)}% of days
-        covered) — no fair comparison
-      </span>
-    ) : (
-      "No previous month to compare yet"
-    );
+  const spendDetail = data.allTime ? (
+    <span>
+      {freshness.earliestDate ? formatDateLong(freshness.earliestDate) : ""} –{" "}
+      {freshness.latestDate ? formatDateLong(freshness.latestDate) : ""}
+    </span>
+  ) : pace.spendToDateMinor === 0 && pace.thisCoverage < 0.05 ? (
+    <span>No statements cover {monthName(data.month)} yet</span>
+  ) : prevComparable ? (
+    <span className={(paceDelta ?? 0) > 0 ? "text-negative" : "text-positive"}>
+      {(paceDelta ?? 0) > 0 ? "+" : ""}
+      {paceDelta}% vs {monthName(pace.prevMonth)}
+      {data.isCurrentMonth ? " at this point" : ""}
+    </span>
+  ) : pace.prevSpendSamePointMinor > 0 ? (
+    <span>
+      {monthName(pace.prevMonth)} data is partial ({Math.round(pace.prevCoverage * 100)}% of days
+      covered) — no fair comparison
+    </span>
+  ) : (
+    "No previous month to compare yet"
+  );
   const overBudgetCount = budgets.filter((b) => b.projectedMinor > b.limitMinor).length;
-  const thisMonthIncome = data.monthly.find((m) => m.month === data.month)?.incomeMinor ?? 0;
+  const thisMonthIncome = data.incomeMinor;
   const netMinor = thisMonthIncome - pace.spendToDateMinor;
   const budgetByCategory = new Map(budgets.map((b) => [b.categoryId, b.limitMinor]));
 
@@ -180,6 +182,7 @@ function DashboardPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
                 {monthOptions(freshness.earliestDate).map((option) => (
                   <SelectItem key={option} value={option}>
                     {monthLabel(option)}
@@ -198,14 +201,16 @@ function DashboardPage() {
       />
       <div className="grid gap-4 p-4 md:grid-cols-3 md:p-6">
         <StatCard
-          label={`${monthName(data.month)} spend`}
+          label={data.allTime ? "All-time spend" : `${monthName(data.month)} spend`}
           value={formatMoney(pace.spendToDateMinor, data.currency)}
           detail={spendDetail}
         >
           <SpendSparkline data={pace.dailySeries} />
         </StatCard>
         <StatCard
-          label={`Net cashflow in ${monthName(data.month)}`}
+          label={
+            data.allTime ? "Net cashflow, all time" : `Net cashflow in ${monthName(data.month)}`
+          }
           value={`${netMinor < 0 ? "−" : "+"}${formatMoney(Math.abs(netMinor), data.currency)}`}
           tone={netMinor < 0 ? "negative" : "positive"}
           detail={`Income ${formatMoney(thisMonthIncome, data.currency)}`}
@@ -235,7 +240,9 @@ function DashboardPage() {
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Where {monthName(data.month)} went</CardTitle>
+            <CardTitle className="text-base">
+              {data.allTime ? "Where it all went" : `Where ${monthName(data.month)} went`}
+            </CardTitle>
             <p className="text-xs text-muted-foreground">Spending net of refunds</p>
           </CardHeader>
           <CardContent>

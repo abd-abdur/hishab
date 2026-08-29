@@ -39,6 +39,7 @@ function lastMonths(count: number): string[] {
 }
 
 function monthLabel(month: string): string {
+  if (month === "all") return "All time";
   const [year, m] = month.split("-");
   return new Date(Number(year), Number(m) - 1, 1).toLocaleDateString("en-AE", {
     month: "long",
@@ -90,6 +91,7 @@ function ReportsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
               {monthOptions.map((m) => (
                 <SelectItem key={m} value={m}>
                   {monthLabel(m)}
@@ -127,7 +129,9 @@ function ReportsPage() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">{monthLabel(month)} by category</CardTitle>
+                  <CardTitle className="text-base">
+                    {month === "all" ? "All time by category" : `${monthLabel(month)} by category`}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {(data?.byCategory ?? []).length === 0 ? (
@@ -163,12 +167,19 @@ function ReportsPage() {
                   <CardTitle className="text-base">Daily spend · {monthLabel(month)}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CashflowCalendar
-                    month={month}
-                    data={data?.daily ?? []}
-                    currency={data?.currency ?? "AED"}
-                    onSelectDay={setSelectedDay}
-                  />
+                  {month === "all" ? (
+                    <p className="text-sm text-muted-foreground">
+                      The daily calendar is a one-month view — pick a specific month above to see
+                      it.
+                    </p>
+                  ) : (
+                    <CashflowCalendar
+                      month={month}
+                      data={data?.daily ?? []}
+                      currency={data?.currency ?? "AED"}
+                      onSelectDay={setSelectedDay}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

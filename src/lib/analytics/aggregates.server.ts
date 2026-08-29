@@ -23,8 +23,12 @@ export function monthRange(month: MonthKey): { from: string; to: string } {
   return { from, to };
 }
 
-export async function getSpendByCategory(userId: string, month: MonthKey, currency: string) {
-  const { from, to } = monthRange(month);
+export async function getSpendByCategory(
+  userId: string,
+  from: string,
+  to: string,
+  currency: string,
+) {
   const rows = await db
     .select({
       categoryId: categories.id,

@@ -234,7 +234,11 @@ function TransactionsPage() {
         title="Transactions"
         description={
           summary
-            ? `${summary.total} transactions · −${formatMoney(summary.totalDebitMinor, summary.currency)} · +${formatMoney(summary.totalCreditMinor, summary.currency)}`
+            ? `${summary.total} transactions · Spent −${formatMoney(summary.spendMinor, summary.currency)} · Income +${formatMoney(summary.incomeMinor, summary.currency)}${
+                summary.transferOutMinor > 0 || summary.transferInMinor > 0
+                  ? ` · Own transfers −${formatMoney(summary.transferOutMinor, summary.currency)} / +${formatMoney(summary.transferInMinor, summary.currency)}`
+                  : ""
+              }`
             : undefined
         }
         actions={
