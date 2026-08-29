@@ -1,17 +1,35 @@
 /**
  * Deterministic recurring-charge detection. Pure function — unit-testable.
  * A merchant becomes a series when it has ≥3 debits whose date gaps cluster
- * around a weekly/monthly/yearly cadence and whose amounts are stable.
+ * around a weekly/monthly/yearly cadence and whose amounts look like BILLING,
+ * not shopping: most charges identical to the fil (or near-zero variance).
+ * Habit categories (groceries, dining, transport…) never form series — a
+ * weekly Noon Minutes order is a habit, not a subscription.
  */
 
 export type RecurringInput = {
   merchantNorm: string;
   merchantDisplay: string;
   categoryId: string;
+  categorySlug: string;
   txnDate: string; // ISO
   amountMinor: number;
   currency: string;
 };
+
+/** Spending habits, not billers — excluded from recurring detection. */
+const HABIT_CATEGORY_SLUGS = new Set([
+  "groceries",
+  "dining",
+  "transport",
+  "fuel",
+  "shopping",
+  "travel",
+  "transfers",
+  "p2p-out",
+  "p2p-in",
+  "uncategorized",
+]);
 
 export type DetectedSeries = {
   merchantNorm: string;
@@ -54,6 +72,7 @@ export function detectRecurringSeries(transactions: RecurringInput[]): DetectedS
   const series: DetectedSeries[] = [];
   for (const [merchantNorm, txns] of byMerchant) {
     if (txns.length < 3) continue;
+    if (txns.some((t) => HABIT_CATEGORY_SLUGS.has(t.categorySlug))) continue;
     const sorted = [...txns].sort((a, b) => a.txnDate.localeCompare(b.txnDate));
 
     const gaps: number[] = [];
@@ -69,13 +88,18 @@ export function detectRecurringSeries(transactions: RecurringInput[]): DetectedS
     const cadence = CADENCES.find((c) => Math.abs(medianGap - c.days) <= c.days * 0.2);
     if (!cadence) continue;
 
-    // amount stability: coefficient of variation < 0.25
+    // Billing, not shopping: most charges must be IDENTICAL to the fil
+    // (subscriptions bill fixed amounts; a price change is one deviation),
+    // or the variance must be near zero.
     const amounts = sorted.map((t) => t.amountMinor);
     const mean = amounts.reduce((a, b) => a + b, 0) / amounts.length;
     if (mean <= 0) continue;
+    const counts = new Map<number, number>();
+    for (const a of amounts) counts.set(a, (counts.get(a) ?? 0) + 1);
+    const modeShare = Math.max(...counts.values()) / amounts.length;
     const variance = amounts.reduce((sum, a) => sum + (a - mean) ** 2, 0) / amounts.length;
     const cv = Math.sqrt(variance) / mean;
-    if (cv >= 0.25) continue;
+    if (modeShare < 0.6 && cv >= 0.08) continue;
 
     const last = sorted[sorted.length - 1]!;
     const priorAmounts = amounts.slice(0, -1);

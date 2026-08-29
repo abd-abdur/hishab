@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { recurringSeries, statements, transactions } from "@/db/schema";
+import { categories, recurringSeries, statements, transactions } from "@/db/schema";
 import { detectRecurringSeries } from "@/lib/analytics/recurring";
 import type { CommitInput } from "./draft-schema";
 
@@ -112,11 +112,13 @@ export async function refreshRecurringSeries(userId: string): Promise<void> {
       merchantNorm: transactions.merchantNorm,
       merchantDisplay: transactions.merchantDisplay,
       categoryId: transactions.categoryId,
+      categorySlug: categories.slug,
       txnDate: transactions.txnDate,
       amountMinor: transactions.amountMinor,
       currency: transactions.currency,
     })
     .from(transactions)
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
     .where(and(eq(transactions.userId, userId), eq(transactions.direction, "debit")));
 
   const detected = detectRecurringSeries(debits);
