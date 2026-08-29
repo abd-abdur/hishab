@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyP2P, holderNameTokens } from "./categorize.server";
+import { classifyP2P, holderNameTokens, isCardRepayment } from "./categorize.server";
+
+describe("isCardRepayment", () => {
+  it("recognizes bank repayment phrasings on credits", () => {
+    expect(isCardRepayment("TRANSFER RECEIVED THANK YOU", "credit")).toBe(true);
+    expect(isCardRepayment("TRANSFER PAYMENT RECEIVED THANK YOU", "credit")).toBe(true);
+    expect(isCardRepayment("PAYMENT RECEIVED", "credit")).toBe(true);
+    expect(isCardRepayment("CREDIT REPAYMENT AUTOPAY", "credit")).toBe(true);
+    expect(isCardRepayment("THANK YOU", "credit")).toBe(true);
+  });
+
+  it("never matches debits or ordinary merchants", () => {
+    expect(isCardRepayment("TRANSFER RECEIVED THANK YOU", "debit")).toBe(false);
+    expect(isCardRepayment("CARREFOUR MOE", "credit")).toBe(false);
+    expect(isCardRepayment("SALARY TRANSFER APPRO LLC", "credit")).toBe(false);
+    expect(isCardRepayment("FROM MEHER MD SAAD", "credit")).toBe(false);
+  });
+});
 
 const holder = holderNameTokens("Abdur Rahman");
 

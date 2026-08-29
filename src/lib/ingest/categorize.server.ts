@@ -51,6 +51,22 @@ export function classifyP2P(
   return match[1] === "TO" ? "out" : "in";
 }
 
+/**
+ * Card-repayment credits, deterministically. Banks phrase these as
+ * "PAYMENT RECEIVED - THANK YOU", "TRANSFER PAYMENT RECEIVED", "CREDIT
+ * REPAYMENT AUTOPAY" — money arriving on a card from the holder's own
+ * account. Always a transfer; never income, never "received from people".
+ */
+export function isCardRepayment(merchantNorm: string, direction: "debit" | "credit"): boolean {
+  if (direction !== "credit") return false;
+  return (
+    /\b(REPAYMENT|AUTOPAY)\b/.test(merchantNorm) ||
+    /\b(PAYMENT|TRANSFER)\s+(PAYMENT\s+)?RECEIVED\b/.test(merchantNorm) ||
+    /\bRECEIVED\b.*\bTHANK\s?YOU\b/.test(merchantNorm) ||
+    /\bTHANK\s?YOU\b/.test(merchantNorm)
+  );
+}
+
 export function holderNameTokens(name: string): Set<string> {
   return new Set(
     name
@@ -104,13 +120,28 @@ export async function categorizeTransactions(
   >();
   const unknown: string[] = [];
 
+  const directionByMerchant = new Map<string, "debit" | "credit">();
+  for (const t of transactions) {
+    if (!directionByMerchant.has(t.merchantNorm)) {
+      directionByMerchant.set(t.merchantNorm, t.direction);
+    }
+  }
+
   for (const merchant of distinctMerchants) {
     const ruleCategory = exactRules.get(merchant) ?? matchContains(containsRules, merchant);
     if (ruleCategory && validIds.has(ruleCategory)) {
       resolved.set(merchant, { categoryId: ruleCategory, source: "rule" });
       continue;
     }
-    // person-to-person rows are decided deterministically, never by the model
+    // card repayments and person-to-person rows are decided deterministically,
+    // never by the model
+    if (isCardRepayment(merchant, directionByMerchant.get(merchant) ?? "debit")) {
+      const transfersId = bySlug.get("transfers");
+      if (transfersId) {
+        resolved.set(merchant, { categoryId: transfersId, source: "dictionary" });
+        continue;
+      }
+    }
     const p2p = classifyP2P(merchant, holderTokens);
     if (p2p) {
       const slug = p2p === "self" ? "transfers" : p2p === "out" ? "p2p-out" : "p2p-in";
@@ -211,7 +242,7 @@ async function categorizeUnknownMerchants(
         model: categorizationModel(),
         schema,
         system: `Assign each merchant to exactly one category slug from this list: ${slugs.join(", ")}.
-Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". Money clearly sent to another person is "p2p-out"; money clearly received from another person is "p2p-in". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
+Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". Money clearly sent to another person is "p2p-out"; money clearly received from another person is "p2p-in". A credit line phrased like "payment received", "transfer received", or "thank you" on a card statement is the holder repaying their own card — always "transfers", never "p2p-in" and never "income". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
         prompt: JSON.stringify(input),
         providerOptions: minimalThinking,
         abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),

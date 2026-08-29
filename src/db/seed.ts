@@ -19,6 +19,7 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["WEST ZONE", "West Zone", "groceries"],
   ["VIVA SUPERMARKET", "Viva", "groceries"],
   ["NESTO", "Nesto", "groceries"],
+  ["NOON MINUTES", "Noon Minutes", "groceries"],
   ["ISTANBUL SUPERMARKET", "Istanbul Supermarket", "groceries"],
   // Dining & delivery
   ["TALABAT", "Talabat", "dining"],
@@ -125,6 +126,7 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["VAT", "VAT", "fees"],
   ["SERVICE CHARGE", "Service Charge", "fees"],
   ["ATM FEE", "ATM Fee", "fees"],
+  ["CREDIT SHIELD", "Credit Shield", "fees"],
   ["INTERNATIONALCARDSPEND", "FX Fee", "fees"],
   ["INTERNATIONAL CARD SPEND", "FX Fee", "fees"],
   ["FX MARKUP", "FX Fee", "fees"],
@@ -136,6 +138,8 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["CREDIT CARD PAYMENT", "Card Repayment", "transfers"],
   ["PAYMENT RECEIVED", "Card Repayment", "transfers"],
   ["AUTOPAY", "Autopay", "transfers"],
+  ["TRANSFER RECEIVED", "Card Repayment", "transfers"],
+  ["TRANSFER PAYMENT RECEIVED", "Card Repayment", "transfers"],
 ];
 
 async function main() {
