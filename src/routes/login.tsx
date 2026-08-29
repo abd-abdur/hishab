@@ -18,7 +18,8 @@ function LoginPage() {
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [needsTotp, setNeedsTotp] = useState(false);
-  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [method, setMethod] = useState<"totp" | "email" | "backup">("totp");
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,15 +48,32 @@ function LoginPage() {
     const code = String(form.get("code")).replace(/\s+/g, "");
     setFormError(null);
     setPending(true);
-    const { error } = useBackupCode
-      ? await twoFactor.verifyBackupCode({ code })
-      : await twoFactor.verifyTotp({ code });
+    // trustDevice: this browser skips the code for the next 2 weeks
+    const { error } =
+      method === "backup"
+        ? await twoFactor.verifyBackupCode({ code, trustDevice: true })
+        : method === "email"
+          ? await twoFactor.verifyOtp({ code, trustDevice: true })
+          : await twoFactor.verifyTotp({ code, trustDevice: true });
     setPending(false);
     if (error) {
       setFormError(authErrorMessage(error, "That code didn't match. Try again."));
       return;
     }
     void navigate({ to: "/app" });
+  }
+
+  async function sendEmailCode() {
+    setFormError(null);
+    setPending(true);
+    const { error } = await twoFactor.sendOtp();
+    setPending(false);
+    if (error) {
+      setFormError(authErrorMessage(error, "Couldn't send the code. Try again."));
+      return;
+    }
+    setMethod("email");
+    setEmailCodeSent(true);
   }
 
   return (
@@ -70,9 +88,13 @@ function LoginPage() {
             <CardTitle>{needsTotp ? "Two-factor code" : "Welcome back"}</CardTitle>
             <CardDescription>
               {needsTotp
-                ? useBackupCode
+                ? method === "backup"
                   ? "Enter one of your backup codes"
-                  : "Enter the 6-digit code from your authenticator app"
+                  : method === "email"
+                    ? emailCodeSent
+                      ? "We emailed you a 6-digit code"
+                      : "Enter the code from your email"
+                    : "Enter the 6-digit code from your authenticator app"
                 : "Sign in to your account"}
             </CardDescription>
           </CardHeader>
@@ -80,11 +102,11 @@ function LoginPage() {
             {needsTotp ? (
               <form method="post" onSubmit={handleTotpSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="code">{useBackupCode ? "Backup code" : "Code"}</Label>
+                  <Label htmlFor="code">{method === "backup" ? "Backup code" : "Code"}</Label>
                   <Input
                     id="code"
                     name="code"
-                    inputMode={useBackupCode ? "text" : "numeric"}
+                    inputMode={method === "backup" ? "text" : "numeric"}
                     autoComplete="one-time-code"
                     autoFocus
                     required
@@ -94,16 +116,45 @@ function LoginPage() {
                 <Button type="submit" className="w-full" disabled={pending}>
                   {pending ? "Verifying…" : "Verify"}
                 </Button>
-                <button
-                  type="button"
-                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setUseBackupCode((v) => !v);
-                    setFormError(null);
-                  }}
-                >
-                  {useBackupCode ? "Use authenticator code instead" : "Use a backup code instead"}
-                </button>
+                <p className="text-center text-xs text-muted-foreground">
+                  This browser won't be asked again for 2 weeks.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {method !== "totp" ? (
+                    <button
+                      type="button"
+                      className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setMethod("totp");
+                        setFormError(null);
+                      }}
+                    >
+                      Use authenticator code instead
+                    </button>
+                  ) : null}
+                  {method !== "email" ? (
+                    <button
+                      type="button"
+                      className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+                      disabled={pending}
+                      onClick={() => void sendEmailCode()}
+                    >
+                      Email me a code instead
+                    </button>
+                  ) : null}
+                  {method !== "backup" ? (
+                    <button
+                      type="button"
+                      className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setMethod("backup");
+                        setFormError(null);
+                      }}
+                    >
+                      Use a backup code instead
+                    </button>
+                  ) : null}
+                </div>
               </form>
             ) : (
               /* method="post" keeps credentials out of the URL if a submit lands before hydration */

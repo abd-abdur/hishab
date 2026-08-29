@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import * as schema from "@/db/schema";
 import {
   isEmailConfigured,
+  otpEmail,
   resetPasswordEmail,
   sendEmail,
   verificationEmail,
@@ -76,7 +77,21 @@ function createAuth() {
           },
         }
       : {}),
-    plugins: [twoFactor(), tanstackStartCookies()],
+    plugins: [
+      twoFactor({
+        // A verified device stays trusted for 2 weeks before the code is
+        // asked for again.
+        trustDeviceMaxAge: 60 * 60 * 24 * 14,
+        otpOptions: {
+          // Email fallback for people without their authenticator at hand.
+          sendOTP: async ({ user, otp }) => {
+            const mail = otpEmail(user.name, otp);
+            await sendEmail({ to: user.email, ...mail });
+          },
+        },
+      }),
+      tanstackStartCookies(),
+    ],
   });
 }
 

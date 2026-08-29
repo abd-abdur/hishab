@@ -86,6 +86,23 @@ export function resetPasswordEmail(name: string, url: string): {
   return { subject, html, text };
 }
 
+export function otpEmail(name: string, otp: string): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const subject = `${otp} is your Hishab sign-in code`;
+  const text = `Hi ${name},\n\nYour Hishab sign-in code is:\n\n${otp}\n\nIt expires shortly. If you weren't signing in, change your password.`;
+  const html = `
+    <div style="font-family: -apple-system, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #2b2a26;">
+      <h2 style="font-weight: 600;">Your sign-in code</h2>
+      <p>Hi ${escapeHtml(name)},</p>
+      <p style="font-size: 28px; font-weight: 600; letter-spacing: 6px; margin: 24px 0;">${escapeHtml(otp)}</p>
+      <p style="color: #6b6a64; font-size: 13px;">It expires shortly. If you weren't signing in, change your password.</p>
+    </div>`;
+  return { subject, html, text };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
