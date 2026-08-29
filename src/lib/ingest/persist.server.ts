@@ -60,6 +60,24 @@ export async function commitStatement(userId: string, input: CommitInput): Promi
   const insertedCount = inserted.length;
   const skipped = input.rows.length - insertedCount;
 
+  // Every row was already in the account: don't keep an empty statement
+  // shell wearing a meaningless reconciliation badge.
+  if (insertedCount === 0) {
+    await db.delete(statements).where(eq(statements.id, statementId));
+    const monthsResult0 = await db.execute(sql`
+      SELECT count(DISTINCT date_trunc('month', txn_date)) AS months
+      FROM transactions WHERE user_id = ${userId}
+    `);
+    return {
+      statementId: "",
+      inserted: 0,
+      skippedDuplicates: skipped,
+      monthsWithData: Number(
+        (monthsResult0.rows as Array<Record<string, unknown>>)[0]?.["months"] ?? 0,
+      ),
+    };
+  }
+
   await db
     .update(statements)
     .set({ transactionCount: insertedCount, duplicateCount: skipped })

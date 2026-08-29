@@ -69,11 +69,17 @@ function StatementsPage() {
       ...input
     }: Parameters<typeof commitStatementFn>[0] & { fileId: string }) => commitStatementFn(input),
     onSuccess: (result, variables) => {
-      toast.success(
-        result.skippedDuplicates > 0
-          ? `${result.inserted} transactions imported · ${result.skippedDuplicates} already existed`
-          : `${result.inserted} transactions imported`,
-      );
+      if (result.inserted === 0) {
+        toast.info(
+          `Everything in this file is already in your account (${result.skippedDuplicates} duplicates) — nothing new was added.`,
+        );
+      } else {
+        toast.success(
+          result.skippedDuplicates > 0
+            ? `${result.inserted} transactions imported · ${result.skippedDuplicates} already existed`
+            : `${result.inserted} transactions imported`,
+        );
+      }
       removeFile(variables.fileId);
       setReviewingId(null);
       void queryClient.invalidateQueries();
