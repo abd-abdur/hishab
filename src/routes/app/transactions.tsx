@@ -259,7 +259,7 @@ function TransactionsPage() {
               </dd>
             </div>
             <div className="bg-card px-4 py-3">
-              <dt className="text-xs text-muted-foreground">Income</dt>
+              <dt className="text-xs text-muted-foreground">Received</dt>
               <dd className="num mt-0.5 font-medium text-positive">
                 +{formatMoney(summary.incomeMinor, summary.currency)}
               </dd>
@@ -276,12 +276,19 @@ function TransactionsPage() {
               </dd>
             </div>
             <div className="bg-card px-4 py-3">
-              <dt className="text-xs text-muted-foreground">Between my accounts</dt>
-              <dd className="num mt-0.5 font-medium text-muted-foreground">
-                {summary.transferOutMinor > 0 || summary.transferInMinor > 0
-                  ? `−${formatMoney(summary.transferOutMinor, summary.currency)} · +${formatMoney(summary.transferInMinor, summary.currency)}`
-                  : "—"}
-              </dd>
+              <dt className="text-xs text-muted-foreground">Moved between my accounts</dt>
+              {summary.transferOutMinor > 0 || summary.transferInMinor > 0 ? (
+                <dd className="num mt-0.5 text-sm text-muted-foreground">
+                  <span className="block">
+                    {formatMoney(summary.transferInMinor, summary.currency)} came in
+                  </span>
+                  <span className="block">
+                    {formatMoney(summary.transferOutMinor, summary.currency)} went out
+                  </span>
+                </dd>
+              ) : (
+                <dd className="num mt-0.5 font-medium text-muted-foreground">—</dd>
+              )}
             </div>
           </dl>
         ) : null}
