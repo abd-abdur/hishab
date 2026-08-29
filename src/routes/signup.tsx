@@ -1,29 +1,33 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { CircleAlert } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signUp } from "@/lib/auth-client";
+import { authErrorMessage, isExistingAccountError, signUp } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
 });
 
+type FormError = { message: string; existingAccount: boolean };
+
 function SignupPage() {
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
+  const [formError, setFormError] = useState<FormError | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const password = String(form.get("password"));
     if (password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+      setFormError({ message: "Password must be at least 8 characters.", existingAccount: false });
       return;
     }
+    setFormError(null);
     setPending(true);
     const { error } = await signUp.email({
       name: String(form.get("name")),
@@ -32,7 +36,10 @@ function SignupPage() {
     });
     setPending(false);
     if (error) {
-      toast.error(error.message ?? "Sign up failed. Please try again.");
+      setFormError({
+        message: authErrorMessage(error, "Sign up failed. Please try again."),
+        existingAccount: isExistingAccountError(error),
+      });
       return;
     }
     void navigate({ to: "/app" });
@@ -76,6 +83,26 @@ function SignupPage() {
                   required
                 />
               </div>
+              {formError ? (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-negative/30 bg-negative/5 px-3 py-2 text-sm text-negative"
+                >
+                  <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>
+                    {formError.message}
+                    {formError.existingAccount ? (
+                      <>
+                        {" "}
+                        <Link to="/login" className="font-medium underline">
+                          Sign in instead
+                        </Link>
+                        .
+                      </>
+                    ) : null}
+                  </span>
+                </div>
+              ) : null}
               <Button type="submit" className="w-full" disabled={pending}>
                 {pending ? "Creating account…" : "Create account"}
               </Button>
