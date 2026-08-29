@@ -340,6 +340,7 @@ function DashboardPage() {
                       value={txn.amountMinor}
                       currency={txn.currency}
                       direction={txn.direction}
+                      neutral={category?.kind === "transfer"}
                       className="text-sm"
                     />
                   </div>

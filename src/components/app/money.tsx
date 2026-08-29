@@ -7,6 +7,11 @@ type MoneyProps = {
   currency?: string;
   /** When set, renders −/+ prefix and the semantic money color. */
   direction?: "debit" | "credit";
+  /**
+   * Transfers between the user's own accounts: keep the sign (money did move)
+   * but drop the gain/loss color — a card repayment is not income.
+   */
+  neutral?: boolean;
   className?: string;
 };
 
@@ -14,13 +19,17 @@ type MoneyProps = {
  * The only way money reaches JSX. Tabular numerals, en-AE currency format,
  * true minus sign, semantic colors for debits/credits.
  */
-export function Money({ value, currency = "AED", direction, className }: MoneyProps) {
+export function Money({ value, currency = "AED", direction, neutral, className }: MoneyProps) {
   if (direction) {
     return (
       <span
         className={cn(
           "num whitespace-nowrap",
-          direction === "debit" ? "text-negative" : "text-positive",
+          neutral
+            ? "text-muted-foreground"
+            : direction === "debit"
+              ? "text-negative"
+              : "text-positive",
           className,
         )}
       >

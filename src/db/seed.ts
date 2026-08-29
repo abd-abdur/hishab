@@ -130,6 +130,12 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["FX MARKUP", "FX Fee", "fees"],
   ["FOREIGN TRANSACTION FEE", "FX Fee", "fees"],
   ["MARKUP FEE", "FX Fee", "fees"],
+  // Transfers between the user's own accounts
+  ["CREDIT REPAYMENT", "Card Repayment", "transfers"],
+  ["CREDIT REPAYMENT AUTOPAY", "Card Repayment", "transfers"],
+  ["CREDIT CARD PAYMENT", "Card Repayment", "transfers"],
+  ["PAYMENT RECEIVED", "Card Repayment", "transfers"],
+  ["AUTOPAY", "Autopay", "transfers"],
 ];
 
 async function main() {

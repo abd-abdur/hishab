@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { memo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 
 import { CategoryPicker, type CategoryOption } from "@/components/app/category-picker";
 import { Money } from "@/components/app/money";
@@ -27,10 +27,12 @@ const ROW_HEIGHT = 48;
 const Row = memo(function Row({
   row,
   categories,
+  isTransfer,
   selected,
   onToggle,
   onCategoryChange,
 }: {
+  isTransfer: boolean;
   row: TransactionRow;
   categories: CategoryOption[];
   selected: boolean;
@@ -83,6 +85,7 @@ const Row = memo(function Row({
           value={row.amountMinor}
           currency={row.currency}
           direction={row.direction}
+          neutral={isTransfer}
           className="text-sm"
         />
       </span>
@@ -112,6 +115,10 @@ export function TransactionsTable({
   totalCount: number;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const transferIds = useMemo(
+    () => new Set(categories.filter((c) => c.kind === "transfer").map((c) => c.id)),
+    [categories],
+  );
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -173,6 +180,7 @@ export function TransactionsTable({
                 <Row
                   row={row}
                   categories={categories}
+                  isTransfer={transferIds.has(row.categoryId)}
                   selected={selection.has(row.id)}
                   onToggle={onToggle}
                   onCategoryChange={onCategoryChange}

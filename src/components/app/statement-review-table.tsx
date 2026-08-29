@@ -23,6 +23,10 @@ export function StatementReviewTable({
   onRowsChange: (rows: DraftRow[]) => void;
 }) {
   const duplicates = rows.filter((r) => r.duplicate).length;
+  const transferIds = useMemo(
+    () => new Set(categories.filter((c) => c.kind === "transfer").map((c) => c.id)),
+    [categories],
+  );
   const totals = useMemo(() => {
     let debit = 0;
     let credit = 0;
@@ -120,6 +124,7 @@ export function StatementReviewTable({
                     value={row.amountMinor}
                     currency={statement.currency}
                     direction={row.direction}
+                    neutral={transferIds.has(row.categoryId)}
                   />
                 </td>
               </tr>

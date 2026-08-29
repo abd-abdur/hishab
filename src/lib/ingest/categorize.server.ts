@@ -171,7 +171,7 @@ async function categorizeUnknownMerchants(
         model: categorizationModel(),
         schema,
         system: `Assign each merchant to exactly one category slug from this list: ${slugs.join(", ")}.
-Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Buy-now-pay-later installments (Tabby, Tamara, Postpay) are "bnpl". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
+Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
         prompt: JSON.stringify(input),
         providerOptions: minimalThinking,
         abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
