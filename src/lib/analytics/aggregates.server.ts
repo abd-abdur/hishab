@@ -116,6 +116,35 @@ export async function getDailySpend(userId: string, from: string, to: string, cu
 }
 
 /**
+ * What fraction of the days in [from, to] fall inside at least one uploaded
+ * statement's period. A month is only comparable when its statements actually
+ * covered it — otherwise "July spend" is an artifact of missing data, not a
+ * spending pattern.
+ */
+export async function getCoverageRatio(userId: string, from: string, to: string): Promise<number> {
+  const rows = await db
+    .select({ periodStart: statements.periodStart, periodEnd: statements.periodEnd })
+    .from(statements)
+    .where(eq(statements.userId, userId));
+
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  const totalDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  if (totalDays <= 0) return 0;
+
+  const covered = new Set<number>();
+  for (const row of rows) {
+    if (!row.periodStart || !row.periodEnd) continue;
+    const ps = new Date(`${row.periodStart}T00:00:00`);
+    const pe = new Date(`${row.periodEnd}T00:00:00`);
+    const first = Math.max(0, Math.round((ps.getTime() - start.getTime()) / 86_400_000));
+    const last = Math.min(totalDays - 1, Math.round((pe.getTime() - start.getTime()) / 86_400_000));
+    for (let d = first; d <= last; d++) covered.add(d);
+  }
+  return covered.size / totalDays;
+}
+
+/**
  * Spend this month through a given day vs. previous month through the same
  * day — the honest "12% ahead of July at this point" comparison.
  */
@@ -135,7 +164,11 @@ export async function getPaceComparison(userId: string, today: Date, currency: s
   const thisCut = `${thisRange.from.slice(0, 8)}${String(dayOfMonth).padStart(2, "0")}`;
 
   // one query spanning both months, sliced locally
-  const daily = await getDailySpend(userId, prevRange.from, thisRange.to, currency);
+  const [daily, prevCoverage, thisCoverage] = await Promise.all([
+    getDailySpend(userId, prevRange.from, thisRange.to, currency),
+    getCoverageRatio(userId, prevRange.from, prevCut),
+    getCoverageRatio(userId, thisRange.from, thisCut),
+  ]);
   const sum = (from: string, to: string) =>
     daily.reduce((total, r) => (r.day >= from && r.day <= to ? total + r.spendMinor : total), 0);
 
@@ -146,6 +179,9 @@ export async function getPaceComparison(userId: string, today: Date, currency: s
     prevSpendSamePointMinor: sum(prevRange.from, prevCut),
     prevMonthTotalMinor: sum(prevRange.from, prevRange.to),
     dailySeries: daily.filter((r) => r.day >= thisRange.from && r.day <= thisCut),
+    /** fraction of compared days actually covered by uploaded statements */
+    prevCoverage,
+    thisCoverage,
   };
 }
 

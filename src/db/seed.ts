@@ -125,6 +125,11 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["VAT", "VAT", "fees"],
   ["SERVICE CHARGE", "Service Charge", "fees"],
   ["ATM FEE", "ATM Fee", "fees"],
+  ["INTERNATIONALCARDSPEND", "FX Fee", "fees"],
+  ["INTERNATIONAL CARD SPEND", "FX Fee", "fees"],
+  ["FX MARKUP", "FX Fee", "fees"],
+  ["FOREIGN TRANSACTION FEE", "FX Fee", "fees"],
+  ["MARKUP FEE", "FX Fee", "fees"],
 ];
 
 async function main() {

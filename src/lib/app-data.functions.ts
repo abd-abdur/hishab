@@ -48,27 +48,42 @@ export const getCategoriesFn = createServerFn({ method: "GET" })
 
 export const getDashboardFn = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
+  .inputValidator(
+    z
+      .object({
+        month: z
+          .string()
+          .regex(/^\d{4}-\d{2}$/)
+          .optional(),
+      })
+      .default({}),
+  )
+  .handler(async ({ data, context }) => {
     const userId = context.userId;
     const today = new Date();
-
-    // A statement-based tracker often has no data yet for the running
-    // calendar month. Anchor the overview to the latest month that actually
-    // has transactions — an August dashboard full of zeros over July data is
-    // misleading, not honest.
     const freshness = await getFreshness(userId);
-    let anchor = today;
-    let isCurrentMonth = true;
-    if (freshness.latestDate) {
-      const latest = new Date(`${freshness.latestDate.slice(0, 10)}T00:00:00`);
-      const sameMonth =
-        latest.getFullYear() === today.getFullYear() && latest.getMonth() === today.getMonth();
-      if (!sameMonth && latest < today) {
-        // anchor to the full extent of the latest data month
-        anchor = new Date(latest.getFullYear(), latest.getMonth() + 1, 0);
-        isCurrentMonth = false;
+
+    let anchor: Date;
+    if (data.month) {
+      // an explicitly chosen month: anchor to its end (or today, if current)
+      const [y, m] = data.month.split("-").map(Number);
+      const monthEnd = new Date(y as number, m as number, 0);
+      anchor = monthEnd < today ? monthEnd : today;
+    } else {
+      // default: the latest month that actually has transactions — an August
+      // dashboard full of zeros over July data is misleading, not honest
+      anchor = today;
+      if (freshness.latestDate) {
+        const latest = new Date(`${freshness.latestDate.slice(0, 10)}T00:00:00`);
+        const sameMonth =
+          latest.getFullYear() === today.getFullYear() && latest.getMonth() === today.getMonth();
+        if (!sameMonth && latest < today) {
+          anchor = new Date(latest.getFullYear(), latest.getMonth() + 1, 0);
+        }
       }
     }
+    const isCurrentMonth =
+      anchor.getFullYear() === today.getFullYear() && anchor.getMonth() === today.getMonth();
     const month =
       `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}` as MonthKey;
     const currency = freshness.primaryCurrency;
@@ -160,11 +175,14 @@ export const getInsightsFn = createServerFn({ method: "GET" })
     if (byCategory.length === 0 && pace.spendToDateMinor === 0) return { insights: [] };
 
     const thisMonthTotals = monthly.find((m) => m.month === month);
+    const prevMonthComparable = pace.prevCoverage >= 0.85;
     const insights = await getInsights(userId, month, {
       month,
       spendToDate: pace.spendToDateMinor / factor,
-      previousMonthSamePoint: pace.prevSpendSamePointMinor / factor,
-      previousMonthTotal: pace.prevMonthTotalMinor / factor,
+      // a partial previous month must never read as a real comparison
+      previousMonthSamePoint: prevMonthComparable ? pace.prevSpendSamePointMinor / factor : null,
+      previousMonthTotal: prevMonthComparable ? pace.prevMonthTotalMinor / factor : null,
+      previousMonthDataPartial: !prevMonthComparable,
       incomeThisMonth: (thisMonthTotals?.incomeMinor ?? 0) / factor,
       topCategories: byCategory.slice(0, 5).map((c) => ({
         name: c.name,

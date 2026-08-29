@@ -128,14 +128,15 @@ export async function refreshRecurringSeries(userId: string): Promise<void> {
 
 /**
  * A debit is flagged unusual when it exceeds 3× the median debit of its
- * category (and a floor of AED 100) — cheap, deterministic, recomputed after
- * every commit.
+ * category (with a floor of AED 100). A category needs at least four debits
+ * before it has a "usual" — a lone hotel booking is not above anything.
  */
 async function refreshAnomalyFlags(userId: string): Promise<void> {
   await db.execute(sql`
     WITH category_medians AS (
       SELECT category_id,
-             percentile_cont(0.5) WITHIN GROUP (ORDER BY amount_minor) AS median_amount
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY amount_minor) AS median_amount,
+             count(*) AS sample_count
       FROM transactions
       WHERE user_id = ${userId} AND direction = 'debit'
       GROUP BY category_id
@@ -143,6 +144,7 @@ async function refreshAnomalyFlags(userId: string): Promise<void> {
     UPDATE transactions t
     SET is_anomaly = (
       t.direction = 'debit'
+      AND m.sample_count >= 4
       AND t.amount_minor > GREATEST(m.median_amount * 3, 10000)
     )
     FROM category_medians m

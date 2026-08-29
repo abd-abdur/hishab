@@ -2,6 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, FileUp, Upload } from "lucide-react";
 import { useMemo } from "react";
+import { z } from "zod";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { CategoryDot } from "@/components/app/category-icon";
 import { EmptyState } from "@/components/app/empty-state";
@@ -18,6 +27,12 @@ import { getCategoriesFn, getDashboardFn, getInsightsFn } from "@/lib/app-data.f
 import { formatDate, formatDateLong, formatMoney } from "@/lib/money";
 
 export const Route = createFileRoute("/app/")({
+  validateSearch: z.object({
+    m: z
+      .string()
+      .regex(/^\d{4}-\d{2}$/)
+      .optional(),
+  }),
   component: DashboardPage,
 });
 
@@ -26,11 +41,33 @@ function monthName(month: string): string {
   return new Date(Number(year), Number(m) - 1, 1).toLocaleDateString("en-AE", { month: "long" });
 }
 
+function monthLabel(month: string): string {
+  const [year, m] = month.split("-");
+  return new Date(Number(year), Number(m) - 1, 1).toLocaleDateString("en-AE", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Every month from the user's earliest data through today, newest first. */
+function monthOptions(earliest: string | null): string[] {
+  const months: string[] = [];
+  const now = new Date();
+  const start = earliest ? new Date(`${earliest.slice(0, 7)}-01T00:00:00`) : now;
+  const cursor = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (cursor >= start && months.length < 36) {
+    months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+    cursor.setMonth(cursor.getMonth() - 1);
+  }
+  return months;
+}
+
 function DashboardPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const { m } = Route.useSearch();
   const { data, isPending } = useQuery({
-    queryKey: ["dashboard"],
-    queryFn: () => getDashboardFn(),
+    queryKey: ["dashboard", m ?? "auto"],
+    queryFn: () => getDashboardFn({ data: m ? { month: m } : {} }),
     staleTime: 60_000,
   });
   const { data: categories } = useQuery({
@@ -89,13 +126,36 @@ function DashboardPage() {
   }
 
   const { pace, budgets, byCategory, freshness } = data;
-  const paceDelta =
-    pace.prevSpendSamePointMinor > 0
-      ? Math.round(
-          ((pace.spendToDateMinor - pace.prevSpendSamePointMinor) / pace.prevSpendSamePointMinor) *
-            100,
-        )
-      : null;
+
+  // A percentage is only honest when the previous month's statements actually
+  // covered the compared window and the base isn't trivially small.
+  const COMPARABLE_COVERAGE = 0.85;
+  const MIN_COMPARE_BASE = 5000; // AED 50 in fils
+  const prevComparable =
+    pace.prevCoverage >= COMPARABLE_COVERAGE && pace.prevSpendSamePointMinor >= MIN_COMPARE_BASE;
+  const paceDelta = prevComparable
+    ? Math.round(
+        ((pace.spendToDateMinor - pace.prevSpendSamePointMinor) / pace.prevSpendSamePointMinor) *
+          100,
+      )
+    : null;
+  const spendDetail =
+    pace.spendToDateMinor === 0 && pace.thisCoverage < 0.05 ? (
+      <span>No statements cover {monthName(data.month)} yet</span>
+    ) : prevComparable ? (
+      <span className={(paceDelta ?? 0) > 0 ? "text-negative" : "text-positive"}>
+        {(paceDelta ?? 0) > 0 ? "+" : ""}
+        {paceDelta}% vs {monthName(pace.prevMonth)}
+        {data.isCurrentMonth ? " at this point" : ""}
+      </span>
+    ) : pace.prevSpendSamePointMinor > 0 ? (
+      <span>
+        {monthName(pace.prevMonth)} data is partial ({Math.round(pace.prevCoverage * 100)}% of days
+        covered) — no fair comparison
+      </span>
+    ) : (
+      "No previous month to compare yet"
+    );
   const overBudgetCount = budgets.filter((b) => b.projectedMinor > b.limitMinor).length;
   const thisMonthIncome = data.monthly.find((m) => m.month === data.month)?.incomeMinor ?? 0;
   const netMinor = thisMonthIncome - pace.spendToDateMinor;
@@ -111,29 +171,36 @@ function DashboardPage() {
             : undefined
         }
         actions={
-          <Button asChild variant="outline" size="sm">
-            <Link to="/app/statements">
-              <Upload className="size-4" />
-              Upload
-            </Link>
-          </Button>
+          <>
+            <Select
+              value={data.month}
+              onValueChange={(value) => void navigate({ search: { m: value } })}
+            >
+              <SelectTrigger className="w-40" aria-label="Month">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions(freshness.earliestDate).map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {monthLabel(option)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/app/statements">
+                <Upload className="size-4" />
+                Upload
+              </Link>
+            </Button>
+          </>
         }
       />
       <div className="grid gap-4 p-4 md:grid-cols-3 md:p-6">
         <StatCard
           label={`${monthName(data.month)} spend`}
           value={formatMoney(pace.spendToDateMinor, data.currency)}
-          detail={
-            paceDelta !== null ? (
-              <span className={paceDelta > 0 ? "text-negative" : "text-positive"}>
-                {paceDelta > 0 ? "+" : ""}
-                {paceDelta}% vs {monthName(pace.prevMonth)}
-                {data.isCurrentMonth ? " at this point" : ""}
-              </span>
-            ) : (
-              "No previous month to compare yet"
-            )
-          }
+          detail={spendDetail}
         >
           <SpendSparkline data={pace.dailySeries} />
         </StatCard>
