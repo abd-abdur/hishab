@@ -11,7 +11,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
@@ -38,9 +38,36 @@ function NotFoundComponent() {
   );
 }
 
+/**
+ * A tab opened before a deploy asks for route chunks the new deploy no longer
+ * serves; the import fails and lands here. One automatic reload fetches the
+ * fresh build, so the person never sees an error screen for a stale tab.
+ * The sessionStorage latch stops a reload loop when the error is real.
+ */
+function isStaleChunkError(error: Error): boolean {
+  return /dynamically imported module|Loading chunk|error loading|Importing a module script failed|Failed to fetch/i.test(
+    `${error.name} ${error.message}`,
+  );
+}
+
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+
+  if (typeof window !== "undefined" && isStaleChunkError(error)) {
+    let reloaded = false;
+    try {
+      reloaded = sessionStorage.getItem("hishab-chunk-reload") === "1";
+      if (!reloaded) sessionStorage.setItem("hishab-chunk-reload", "1");
+    } catch {
+      /* storage unavailable; fall through to the error screen */
+      reloaded = true;
+    }
+    if (!reloaded) {
+      window.location.reload();
+      return null;
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -123,6 +150,16 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // a page rendered, so the build in this tab is coherent again; re-arm the
+  // stale-chunk auto-reload for the next deploy
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("hishab-chunk-reload");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
