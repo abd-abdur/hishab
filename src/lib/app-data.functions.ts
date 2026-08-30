@@ -377,6 +377,7 @@ const TransactionFiltersSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   statementId: z.string().optional(),
+  country: z.string().length(2).optional(),
   anomaly: z.boolean().optional(),
   offset: z.number().int().nonnegative().default(0),
   limit: z.number().int().min(1).max(500).default(200),
@@ -399,6 +400,7 @@ function transactionConditions(userId: string, f: TransactionFilters) {
   if (f.from) conditions.push(gte(transactions.txnDate, f.from));
   if (f.to) conditions.push(lte(transactions.txnDate, f.to));
   if (f.statementId) conditions.push(eq(transactions.statementId, f.statementId));
+  if (f.country) conditions.push(eq(transactions.country, f.country));
   if (f.anomaly) conditions.push(eq(transactions.isAnomaly, true));
   return and(...conditions);
 }
