@@ -129,7 +129,7 @@ function DashboardPage() {
           <EmptyState
             icon={FileUp}
             title="Add your first statement"
-            description="Upload bank statements — PDF, photos of pages, CSV or Excel — and they become searchable transactions, budgets and trends."
+            description="Upload bank statements, whether PDF, photos of pages, CSV or Excel, and they become searchable transactions, budgets and trends."
           >
             <Button asChild>
               <Link to="/app/statements">
@@ -185,7 +185,7 @@ function DashboardPage() {
   ) : pace.prevSpendSamePointMinor > 0 ? (
     <span>
       {monthName(pace.prevMonth)} data is partial ({Math.round(pace.prevCoverage * 100)}% of days
-      covered) — no fair comparison
+      covered), so no fair comparison
     </span>
   ) : (
     "No previous month to compare yet"
@@ -302,7 +302,7 @@ function DashboardPage() {
             {data.transfers.count > 0 ? (
               <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
                 Plus {data.transfers.count} transfer{data.transfers.count === 1 ? "" : "s"} between
-                your own accounts — money that changed pockets, not spending ·{" "}
+                your own accounts: money that changed pockets, not spending ·{" "}
                 <Link
                   to="/app/transactions"
                   search={{ cat: "sys_transfers", ...monthBounds(data.month) }}

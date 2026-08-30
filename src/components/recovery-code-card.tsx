@@ -37,8 +37,8 @@ export function RecoveryCodeCard({
         </CardTitle>
         <CardDescription>
           Your financial data is protected by an encryption key only you hold. If you ever forget
-          your password, this code is the <strong>only</strong> way back into your data — we
-          cannot recover it for you.
+          your password, this code is the <strong>only</strong> way back into your data; we cannot
+          recover it for you.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -46,7 +46,11 @@ export function RecoveryCodeCard({
           {recoveryCode}
         </div>
         <Button variant="outline" className="w-full" onClick={() => void copy()}>
-          {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+          {copied ? (
+            <Check className="size-4" aria-hidden />
+          ) : (
+            <Copy className="size-4" aria-hidden />
+          )}
           {copied ? "Copied" : "Copy code"}
         </Button>
         <label className="flex items-start gap-2 text-sm">
@@ -57,7 +61,7 @@ export function RecoveryCodeCard({
             onChange={(e) => setAcknowledged(e.target.checked)}
           />
           <span>
-            I've saved this code somewhere safe (a password manager, or written down — not just
+            I've saved this code somewhere safe (a password manager, or written down, not just on
             this device).
           </span>
         </label>

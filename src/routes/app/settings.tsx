@@ -66,7 +66,7 @@ function SettingsPage() {
       setCategoryName("");
       void queryClient.invalidateQueries({ queryKey: ["categories"] });
     },
-    onError: () => toast.error("Couldn't create the category — maybe it already exists."),
+    onError: () => toast.error("Couldn't create the category. Perhaps it already exists."),
   });
 
   return (
@@ -176,7 +176,9 @@ function SettingsPage() {
 function TwoFactorCard() {
   const { data: sessionData, refetch } = useSession();
   const enabled = Boolean(
-    sessionData?.user && "twoFactorEnabled" in sessionData.user && sessionData.user.twoFactorEnabled,
+    sessionData?.user &&
+    "twoFactorEnabled" in sessionData.user &&
+    sessionData.user.twoFactorEnabled,
   );
 
   const [password, setPassword] = useState("");
@@ -237,7 +239,7 @@ function TwoFactorCard() {
         </CardTitle>
         <CardDescription>
           {enabled
-            ? "On — signing in asks for a code from your authenticator app."
+            ? "On. Signing in asks for a code from your authenticator app."
             : "Add a second step at sign-in using an authenticator app (Google Authenticator, 1Password, etc.)."}
         </CardDescription>
       </CardHeader>
@@ -260,7 +262,7 @@ function TwoFactorCard() {
             <div className="space-y-1">
               <p className="font-medium">Backup codes</p>
               <p className="text-muted-foreground">
-                Save these somewhere safe — each one signs you in once if you lose your
+                Save these somewhere safe; each one signs you in once if you lose your
                 authenticator.
               </p>
               <div className="grid grid-cols-2 gap-x-4 rounded-md border bg-muted/40 p-3 font-mono text-xs select-all">

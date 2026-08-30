@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/ingest")({
           .from(ingestEvents)
           .where(and(eq(ingestEvents.userId, userId), gte(ingestEvents.createdAt, hourAgo)));
         if ((recent?.n ?? 0) >= INGEST_HOURLY_LIMIT) {
-          return new Response("Upload limit reached — try again in an hour.", { status: 429 });
+          return new Response("Upload limit reached. Try again in an hour.", { status: 429 });
         }
 
         let body: unknown;

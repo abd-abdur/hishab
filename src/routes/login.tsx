@@ -53,7 +53,7 @@ function LoginPage() {
     }
     if (unlock.status === "error") {
       setFormError(
-        "Signed in, but your encrypted data couldn't be unlocked — check your connection and sign in again. Your data is safe.",
+        "Signed in, but your encrypted data couldn't be unlocked. Check your connection and sign in again. Your data is safe.",
       );
       return;
     }
@@ -163,8 +163,8 @@ function LoginPage() {
               Unlock your data
             </CardTitle>
             <CardDescription>
-              Your password changed, so your encryption key needs your recovery code — the one
-              Hishab showed you when the key was created.
+              Your password changed, so your encryption key needs your recovery code, the one Hishab
+              showed you when the key was created.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -182,7 +182,7 @@ function LoginPage() {
                 className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
                 onClick={() => void navigate({ to: "/app" })}
               >
-                Continue with locked data — readable again once you unlock
+                Continue with locked data; it becomes readable once you unlock
               </button>
             </form>
           </CardContent>

@@ -67,7 +67,10 @@ function SignupPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm">
-          <RecoveryCodeCard recoveryCode={recoveryCode} onDone={() => void navigate({ to: "/app" })} />
+          <RecoveryCodeCard
+            recoveryCode={recoveryCode}
+            onDone={() => void navigate({ to: "/app" })}
+          />
         </div>
       </main>
     );
@@ -109,7 +112,7 @@ function SignupPage() {
           <CardHeader>
             <CardTitle>Create your account</CardTitle>
             <CardDescription>
-              Your statements stay yours — exportable and deletable.
+              Your statements stay yours: exportable and deletable, always.
             </CardDescription>
           </CardHeader>
           <CardContent>

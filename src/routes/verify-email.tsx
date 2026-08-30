@@ -34,7 +34,7 @@ function VerifyEmailPage() {
     if (sentOnce.current) return;
     sentOnce.current = true;
     void requestReverifyCodeFn().catch(() => {
-      setNotice("Couldn't send the code automatically — use the resend button.");
+      setNotice("Couldn't send the code automatically. Use the resend button.");
     });
   }, []);
 
@@ -50,7 +50,7 @@ function VerifyEmailPage() {
         setFormError(
           result.error === "mismatch"
             ? "That code didn't match. Check the latest email and try again."
-            : "That code has expired — we can send you a fresh one.",
+            : "That code has expired. We can send you a fresh one.",
         );
         return;
       }
@@ -65,7 +65,7 @@ function VerifyEmailPage() {
     setPending(true);
     try {
       await requestReverifyCodeFn();
-      setNotice("Sent — check your inbox.");
+      setNotice("Sent. Check your inbox.");
     } catch {
       setNotice("Couldn't send the code. Try again in a minute.");
     } finally {

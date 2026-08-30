@@ -54,7 +54,7 @@ export function MigrationBanner({ userId }: { userId: string }) {
       {failed ? (
         <>
           <span className="min-w-0 flex-1">
-            Encrypting your earlier data paused partway — nothing is lost, it resumes where it
+            Encrypting your earlier data paused partway. Nothing is lost; it resumes where it
             stopped.
           </span>
           <Button
@@ -74,7 +74,7 @@ export function MigrationBanner({ userId }: { userId: string }) {
           Encrypting your earlier data{" "}
           {progress ? (
             <span className="num text-muted-foreground">
-              — {progress.done} of {progress.total}
+              · {progress.done} of {progress.total}
             </span>
           ) : (
             "…"

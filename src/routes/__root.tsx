@@ -78,11 +78,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Hishab — every dirham, accounted for" },
+      { title: "Hishab · every dirham, accounted for" },
       {
         name: "description",
         content:
-          "Upload bank statements — PDF, scans, CSV or Excel — and Hishab turns them into searchable transactions, budgets and trends. AED-first, fluent in any currency.",
+          "Upload your bank statements, whether PDF, scans, CSV or Excel, and Hishab turns them into searchable transactions, budgets and trends. Built AED-first, fluent in any currency.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

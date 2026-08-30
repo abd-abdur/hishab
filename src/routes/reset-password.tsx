@@ -48,11 +48,11 @@ function ResetPasswordPage() {
     setPending(false);
     if (error) {
       setFormError(
-        authErrorMessage(error, "Couldn't reset the password — the link may have expired."),
+        authErrorMessage(error, "Couldn't reset the password. The link may have expired."),
       );
       return;
     }
-    toast.success("Password changed — sign in with your new password");
+    toast.success("Password changed. Sign in with your new password");
     void navigate({ to: "/login" });
   }
 

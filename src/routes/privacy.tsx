@@ -13,9 +13,9 @@ function PrivacyPage() {
         <h2>The short version</h2>
         <p>
           Hishab reads the bank statements you choose to upload, turns them into transactions, and
-          shows you where your money goes. Your financial data is yours: we don't sell it, we
-          don't show it to other users, and you can delete it — or your whole account — at any
-          time. Statement files themselves are never stored; only the extracted rows are.
+          shows you where your money goes. Your financial data is yours: we don't sell it, we don't
+          show it to other users, and you can delete it, or your whole account, at any time.
+          Statement files themselves are never stored; only the extracted rows are.
         </p>
       </section>
 
@@ -23,22 +23,22 @@ function PrivacyPage() {
         <h2>What we collect</h2>
         <ul>
           <li>
-            <strong>Account details</strong> — your name, email address, and a hashed password
-            (we never store the password itself). If you enable two-factor authentication, an
-            encrypted authenticator secret.
+            <strong>Account details:</strong> your name, email address, and a hashed password (we
+            never store the password itself). If you enable two-factor authentication, an encrypted
+            authenticator secret.
           </li>
           <li>
-            <strong>Financial data you upload</strong> — transactions extracted from your
-            statements: dates, descriptions, merchants, amounts, running balances, and statement
-            metadata such as the bank name, statement period, and a masked account number.
+            <strong>Financial data you upload:</strong> transactions extracted from your statements:
+            dates, descriptions, merchants, amounts, running balances, and statement metadata such
+            as the bank name, statement period, and a masked account number.
           </li>
           <li>
-            <strong>Session data</strong> — IP address and browser type for each sign-in, used
-            for security.
+            <strong>Session data:</strong> IP address and browser type for each sign-in, used for
+            security.
           </li>
           <li>
-            <strong>Usage analytics</strong> — anonymous page-view analytics (Vercel Analytics)
-            with no cross-site tracking and no advertising identifiers.
+            <strong>Usage analytics:</strong> anonymous page-view counts with no cross-site tracking
+            and no advertising identifiers. They never identify you.
           </li>
         </ul>
       </section>
@@ -59,39 +59,40 @@ function PrivacyPage() {
       </section>
 
       <section>
-        <h2>How AI is involved</h2>
+        <h2>How your statements are read</h2>
         <p>
-          During upload, the text of your statement is sent to a third-party AI service to
-          transcribe transaction rows — with account, card, and IBAN numbers already masked. The
-          AI's output is checked by deterministic arithmetic (reconciliation against your
-          statement's balances) before you review it. Statement text is not stored by us after
-          processing. All totals, charts, and analytics are computed by ordinary arithmetic on
-          your data, not by AI.
+          During upload, the text of your statement passes through a specialist third-party
+          transcription service that turns printed rows into structured transactions, with account,
+          card, and IBAN numbers already masked before anything leaves your browser. Every
+          transcription is then checked by plain arithmetic, reconciled against the balances your
+          statement prints, before you review it. Statement text is not kept after processing, and
+          every total, chart, and trend you see is computed by ordinary arithmetic on your own data.
+          Nothing is estimated, ever.
         </p>
       </section>
 
       <section>
         <h2>Where your data lives</h2>
         <p>
-          Data is stored in a managed Postgres database (Neon) hosted in the AWS Singapore
-          region, encrypted at rest and in transit. The application runs on Vercel. Transactional
-          emails (verification links, sign-in codes, password resets) are delivered through our
-          email provider; email content is limited to what the message needs.
+          Your data resides on professionally managed, enterprise-grade infrastructure and is
+          encrypted at rest and in transit. Transactional emails (verification links, sign-in codes,
+          password resets) are delivered through a reputable email provider, and their content is
+          limited to what the message strictly needs.
         </p>
       </section>
 
       <section>
         <h2>Your rights and controls</h2>
         <ul>
-          <li>Delete any statement — its transactions go with it, immediately.</li>
+          <li>Delete any statement; its transactions go with it, immediately.</li>
           <li>
-            Delete your account — everything linked to it (statements, transactions, budgets,
-            rules, sessions) is removed by the database itself, not a background job.
+            Delete your account, and everything linked to it (statements, transactions, budgets,
+            rules, sessions) is removed at once, not by a background job.
           </li>
           <li>Export your transactions to CSV at any time.</li>
           <li>
-            Ask us to access, correct, or erase your personal data, consistent with the UAE
-            Personal Data Protection Law (Federal Decree-Law No. 45 of 2021).
+            Ask us to access, correct, or erase your personal data, consistent with the UAE Personal
+            Data Protection Law (Federal Decree-Law No. 45 of 2021).
           </li>
         </ul>
       </section>
@@ -99,35 +100,38 @@ function PrivacyPage() {
       <section>
         <h2>Encryption: what we can and cannot read</h2>
         <p>
-          The identifying content of your transactions — descriptions, merchant names, statement
-          file names, bank names, masked account numbers — is <strong>encrypted in your browser
-          before it reaches us</strong>, with a key derived from your password that never leaves
-          your device. What our database stores for those fields is ciphertext we cannot decrypt:
-          not our team, not our database host, not anyone with a copy of the database.
+          The identifying content of your transactions (descriptions, merchant names, statement file
+          names, bank names, masked account numbers) is{" "}
+          <strong>encrypted in your browser before it reaches us</strong>, with a key derived from
+          your password that never leaves your device. What we hold for those fields is ciphertext
+          we cannot decrypt: not our team, not our infrastructure providers, not anyone with a copy
+          of our records.
         </p>
         <p>
           Two things stay readable to the server, deliberately: the numeric skeleton (amounts,
-          dates, direction, category) — which is what computes your totals, budgets, and trends —
-          and a scrambled merchant fingerprint that lets equal merchants group together without
-          revealing who they are. A technical note in the same spirit of candor: the
-          duplicate-detection fingerprint on each row is derived from the original text before
-          encryption, so someone with our database and a large list of guessed merchants could in
-          principle test guesses against it. It reveals nothing directly.
+          dates, direction, category, and a coarse country code for the by-country report), which is
+          what computes your totals, budgets, and trends, and a scrambled merchant fingerprint that
+          lets equal merchants group together without revealing who they are. A technical note in
+          the same spirit of candor: the duplicate-detection fingerprint on each row is derived from
+          the original text before encryption, so someone holding our records and a large list of
+          guessed merchants could in principle test guesses against it. It reveals nothing directly.
         </p>
         <p>
-          The flip side of encryption we can't undo: <strong>if you lose both your password and
-          your recovery code, your encrypted data is unrecoverable — by anyone.</strong> Save the
-          recovery code Hishab shows you.
+          The flip side of encryption we can't undo:{" "}
+          <strong>
+            if you lose both your password and your recovery code, your encrypted data is
+            unrecoverable by anyone.
+          </strong>{" "}
+          Save the recovery code Hishab shows you.
         </p>
       </section>
 
       <section>
         <h2>Security measures</h2>
         <p>
-          Passwords are hashed with a modern algorithm and must be at least 12 characters.
-          Optional two-factor authentication, sign-in rate limiting, periodic email
-          re-verification, upload quotas, and scrubbed server logs (statement content is never
-          logged) are all in place.
+          Passwords are hashed with a modern algorithm and must be at least 12 characters. Optional
+          two-factor authentication, sign-in rate limiting, periodic email re-verification, upload
+          quotas, and scrubbed server logs (statement content is never logged) are all in place.
         </p>
       </section>
 

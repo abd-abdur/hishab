@@ -80,7 +80,7 @@ const Row = memo(function Row({
             <Badge
               variant="outline"
               className="ml-2 align-middle text-[11px] text-muted-foreground"
-              title="An opposite entry with the same amount exists in another of your statements — one internal move, seen from both accounts"
+              title="An opposite entry with the same amount exists in another of your statements: one internal move, seen from both accounts"
             >
               own move
             </Badge>

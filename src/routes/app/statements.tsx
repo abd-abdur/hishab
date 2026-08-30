@@ -78,7 +78,7 @@ function StatementsPage() {
     onSuccess: (result, variables) => {
       if (result.inserted === 0) {
         toast.info(
-          `Everything in this file is already in your account (${result.skippedDuplicates} duplicates) — nothing new was added.`,
+          `Everything in this file is already in your account (${result.skippedDuplicates} duplicates). Nothing new was added.`,
         );
       } else {
         toast.success(
@@ -100,7 +100,7 @@ function StatementsPage() {
         /* storage unavailable — skip the moment */
       }
     },
-    onError: () => toast.error("Saving failed. Your review is still here — try again."),
+    onError: () => toast.error("Saving failed. Your review is still here; try again."),
   });
 
   const deleteMutation = useMutation({
@@ -269,7 +269,7 @@ function StatementsPage() {
               <DialogHeader>
                 <DialogTitle>Review {reviewing.fileName}</DialogTitle>
                 <DialogDescription>
-                  Fix anything that looks off — categories are editable. Nothing is saved until you
+                  Fix anything that looks off; categories are editable. Nothing is saved until you
                   confirm.
                 </DialogDescription>
               </DialogHeader>
@@ -298,7 +298,7 @@ function StatementsPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">
-              Two months of data — your trends just came alive
+              Two months of data. Your trends just came alive
             </DialogTitle>
             <DialogDescription>This is where hishab starts earning its keep.</DialogDescription>
           </DialogHeader>
@@ -309,7 +309,7 @@ function StatementsPage() {
             </li>
             <li className="flex gap-2">
               <span className="mt-2 size-1 shrink-0 rounded-full bg-primary" />
-              Recurring detection has more history to work with — subscriptions and price changes
+              Recurring detection has more history to work with, so subscriptions and price changes
               start surfacing.
             </li>
             <li className="flex gap-2">

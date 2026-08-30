@@ -220,7 +220,7 @@ function ReportsPage() {
           <EmptyState
             icon={ChartColumn}
             title="Nothing to report yet"
-            description="Reports build up as you add statements — trends, a spending calendar and merchant totals."
+            description="Reports build up as you add statements: trends, a spending calendar and merchant totals."
           />
         ) : (
           <Tabs defaultValue="trends">
@@ -290,9 +290,9 @@ function ReportsPage() {
                     <p className="text-sm text-muted-foreground">No spending this month.</p>
                   ) : countrySlices.length === 1 ? (
                     <p className="text-sm">
-                      All spending this period —{" "}
+                      All spending this period,{" "}
                       <Money value={countryTotal} currency={data?.currency ?? "AED"} /> across{" "}
-                      {countrySlices[0]!.count} transactions — was in{" "}
+                      {countrySlices[0]!.count} transactions, was in{" "}
                       <span className="font-medium">{countrySlices[0]!.name}</span>.
                     </p>
                   ) : (
@@ -327,7 +327,7 @@ function ReportsPage() {
                 <CardHeader>
                   <CardTitle className="text-base">Categories, month by month</CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    Top categories stacked per month — the shape of where the money goes
+                    Top categories stacked per month, the shape of where the money goes
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -383,7 +383,7 @@ function ReportsPage() {
                 <CardContent>
                   {month === "all" ? (
                     <p className="text-sm text-muted-foreground">
-                      The daily calendar is a one-month view — pick a specific month above to see
+                      The daily calendar is a one-month view. Pick a specific month above to see
                       it.
                     </p>
                   ) : (

@@ -93,26 +93,26 @@ const TRUTHS = [
     icon: CheckCircle2,
     preview: ReviewPreview,
     title: "You approve every row",
-    body: "Statements are transcribed into individual transactions and shown to you first — editable, with duplicates flagged. Where a statement prints balances, Hishab checks that the rows add up to the fils and tells you when they don't.",
+    body: "Every statement is transcribed into individual transactions and presented to you first: fully editable, with duplicates flagged. Where a statement prints balances, Hishab checks that the rows add up to the fils and tells you when they don't.",
   },
   {
     icon: CalendarClock,
     preview: RecurringPreview,
     title: "Subscriptions can't hide",
-    body: "Recurring charges are detected from your actual history — cadence, next expected date, and price rises like a streaming plan quietly going from AED 39 to AED 45.",
+    body: "Recurring charges are detected from your actual history: the cadence, the next expected date, and price rises like a streaming plan quietly climbing from AED 39 to AED 45.",
   },
   {
     icon: SlidersHorizontal,
     preview: BudgetPreview,
     title: "Budgets with an honest pace",
-    body: 'Set a monthly limit per category and see a projection from your real pace — "on track to hit AED 1,860 of 2,000" — always labeled with how far your data actually goes.',
+    body: 'Set a monthly limit per category and watch a projection built from your real pace, "on track to hit AED 1,860 of 2,000", always labeled with how far your data actually goes.',
   },
 ];
 
 const FAQS = [
   {
     q: "Which banks and formats work?",
-    a: "Any bank. Hishab reads the statement itself — text PDFs, scanned pages, photos, CSV and Excel exports — rather than connecting to your bank. Up to 10 files at a time.",
+    a: "Any bank. Hishab reads the statement itself, whether a text PDF, a scanned page, a photo, or a CSV and Excel export, rather than connecting to your bank. Up to 10 files at a time.",
   },
   {
     q: "What about currencies other than AED?",
@@ -120,11 +120,11 @@ const FAQS = [
   },
   {
     q: "How accurate are the numbers?",
-    a: "Transactions are transcribed row by row, then every total is computed arithmetic — nothing is estimated. When a statement prints opening and closing balances, Hishab reconciles against them and shows a verified badge (or an honest warning).",
+    a: "Transactions are transcribed row by row, then every total is computed with plain arithmetic. Nothing is estimated. When a statement prints opening and closing balances, Hishab reconciles against them and shows a verified badge, or an honest warning.",
   },
   {
     q: "What happens to my data?",
-    a: "Your transactions are stored in your account so budgets and trends work across months and devices. Export everything as CSV or delete any statement — and its transactions — whenever you like. No bank logins, ever.",
+    a: "Your transactions are stored in your account so budgets and trends work across months and devices. Export everything as CSV, or delete any statement and its transactions whenever you please. No bank logins, ever.",
   },
 ];
 
@@ -164,8 +164,8 @@ function LandingPage() {
             Your statements, finally legible.
           </h1>
           <p className="mt-4 max-w-md text-lg text-muted-foreground">
-            Upload a bank statement — PDF, a photo of a page, CSV or Excel. Hishab turns it into
-            searchable transactions, budgets and trends. AED-first, fluent in any currency.
+            Upload a bank statement, be it a PDF, a photo of a page, CSV or Excel. Hishab turns it
+            into searchable transactions, budgets and trends. AED-first, fluent in any currency.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             {signedIn ? (
@@ -225,12 +225,12 @@ function LandingPage() {
             budgets carry over. All of it is exportable as CSV and deletable statement by statement.
           </p>
           <p>
-            What's not: your bank credentials — Hishab never connects to your bank. Files you upload
+            What's not: your bank credentials. Hishab never connects to your bank. Files you upload
             are processed to extract transactions and are not kept as documents. Your data is not
             sold or shared.
           </p>
           <p>
-            Categorization is automatic and correctable — fix a merchant once and Hishab remembers
+            Categorization is automatic and correctable: fix a merchant once and Hishab remembers
             your choice for every future statement.
           </p>
         </div>
@@ -255,7 +255,7 @@ function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:px-6">
           <div className="flex items-center gap-2">
             <BrandMark size={20} />
-            hishab — every dirham, accounted for
+            hishab · every dirham, accounted for
           </div>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="hover:text-foreground">

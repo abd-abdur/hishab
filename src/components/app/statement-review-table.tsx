@@ -58,8 +58,8 @@ export function StatementReviewTable({
           <Badge variant="outline" className="gap-1 text-warning">
             <CircleAlert className="size-3.5" />
             Off by{" "}
-            {formatMoney(Math.abs(statement.reconciliationDeltaMinor ?? 0), statement.currency)} —
-            check the rows
+            {formatMoney(Math.abs(statement.reconciliationDeltaMinor ?? 0), statement.currency)}.
+            Check the rows
           </Badge>
         ) : (
           <Badge variant="outline" className="text-muted-foreground">
@@ -80,8 +80,8 @@ export function StatementReviewTable({
         ) : null}
         {similars > 3 ? (
           <span className="text-warning">
-            {similars} rows match existing transactions by date and amount under a different name —
-            if this file is a fee breakdown or overlaps another statement, consider not adding it
+            {similars} rows match existing transactions by date and amount under a different name.
+            If this file is a fee breakdown or overlaps another statement, consider not adding it
           </span>
         ) : null}
       </div>

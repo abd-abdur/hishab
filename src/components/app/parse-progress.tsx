@@ -21,7 +21,7 @@ function statusLine(file: UploadFileState): string {
         case "verifying":
           return "Checking the math…";
         case "rechecking":
-          return "Numbers didn't add up — taking a closer look…";
+          return "Numbers didn't add up. Taking a closer look…";
         case "categorizing":
           return "Categorizing…";
         case "checking_duplicates":
