@@ -3,6 +3,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandMenu } from "@/components/app/command-menu";
 import { IdleLogout } from "@/components/app/idle-logout";
+import { MigrationBanner } from "@/components/app/migration-banner";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSessionFn } from "@/lib/auth-middleware";
 
@@ -32,6 +33,7 @@ function AppLayout() {
       </a>
       <AppSidebar user={{ name: session.name, email: session.email }} />
       <SidebarInset id="main">
+        <MigrationBanner userId={session.userId} />
         <Outlet />
       </SidebarInset>
       <CommandMenu />

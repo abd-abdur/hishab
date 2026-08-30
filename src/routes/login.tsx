@@ -36,8 +36,8 @@ function LoginPage() {
 
   /**
    * After authentication succeeds: unlock (or provision) the encryption key.
-   * Nothing is encrypted with it yet, so every failure falls open into the
-   * app rather than blocking the user.
+   * Stored data is ciphertext now, so an unlock failure surfaces instead of
+   * silently entering an app full of locked values.
    */
   async function finishSignIn() {
     const unlock = await unlockWithPassword(userIdRef.current, passwordRef.current);
@@ -49,6 +49,12 @@ function LoginPage() {
       // The password changed (reset) since the key was wrapped — the recovery
       // code is the way back to the same key.
       setStep({ kind: "recovery" });
+      return;
+    }
+    if (unlock.status === "error") {
+      setFormError(
+        "Signed in, but your encrypted data couldn't be unlocked — check your connection and sign in again. Your data is safe.",
+      );
       return;
     }
     void navigate({ to: "/app" });
@@ -176,7 +182,7 @@ function LoginPage() {
                 className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
                 onClick={() => void navigate({ to: "/app" })}
               >
-                Skip for now
+                Continue with locked data — readable again once you unlock
               </button>
             </form>
           </CardContent>

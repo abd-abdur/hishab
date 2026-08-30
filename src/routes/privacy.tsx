@@ -8,7 +8,7 @@ export const Route = createFileRoute("/privacy")({
 
 function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="29 August 2026">
+    <LegalPage title="Privacy Policy" updated="30 August 2026">
       <section>
         <h2>The short version</h2>
         <p>
@@ -97,14 +97,37 @@ function PrivacyPage() {
       </section>
 
       <section>
+        <h2>Encryption: what we can and cannot read</h2>
+        <p>
+          The identifying content of your transactions — descriptions, merchant names, statement
+          file names, bank names, masked account numbers — is <strong>encrypted in your browser
+          before it reaches us</strong>, with a key derived from your password that never leaves
+          your device. What our database stores for those fields is ciphertext we cannot decrypt:
+          not our team, not our database host, not anyone with a copy of the database.
+        </p>
+        <p>
+          Two things stay readable to the server, deliberately: the numeric skeleton (amounts,
+          dates, direction, category) — which is what computes your totals, budgets, and trends —
+          and a scrambled merchant fingerprint that lets equal merchants group together without
+          revealing who they are. A technical note in the same spirit of candor: the
+          duplicate-detection fingerprint on each row is derived from the original text before
+          encryption, so someone with our database and a large list of guessed merchants could in
+          principle test guesses against it. It reveals nothing directly.
+        </p>
+        <p>
+          The flip side of encryption we can't undo: <strong>if you lose both your password and
+          your recovery code, your encrypted data is unrecoverable — by anyone.</strong> Save the
+          recovery code Hishab shows you.
+        </p>
+      </section>
+
+      <section>
         <h2>Security measures</h2>
         <p>
           Passwords are hashed with a modern algorithm and must be at least 12 characters.
           Optional two-factor authentication, sign-in rate limiting, periodic email
           re-verification, upload quotas, and scrubbed server logs (statement content is never
-          logged) are all in place. We are building client-side encryption so that stored
-          financial data becomes unreadable to anyone but you — including us; this policy will be
-          updated when it ships.
+          logged) are all in place.
         </p>
       </section>
 
