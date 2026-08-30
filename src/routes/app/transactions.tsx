@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCategoriesFn, getTransactionsFn } from "@/lib/app-data.functions";
+import { getMyCountriesFn } from "@/lib/country.functions";
 import { recategorizeFn } from "@/lib/app-mutations.functions";
 import { decryptRows } from "@/lib/enc-data";
 import { getStoredKeys } from "@/lib/key-store";
@@ -40,6 +41,7 @@ const SearchSchema = z.object({
   to: z.string().optional(),
   statement: z.string().optional(),
   anomaly: z.boolean().optional(),
+  country: z.string().optional(),
 });
 
 export const Route = createFileRoute("/app/transactions")({
@@ -66,6 +68,7 @@ function TransactionsPage() {
       to: search.to,
       statementId: search.statement,
       anomaly: search.anomaly,
+      country: search.country,
     }),
     [search],
   );
@@ -75,6 +78,18 @@ function TransactionsPage() {
     queryFn: () => getCategoriesFn(),
     staleTime: 300_000,
   });
+  const { data: myCountries } = useQuery({
+    queryKey: ["my-countries", session.userId],
+    queryFn: () => getMyCountriesFn(),
+    staleTime: 300_000,
+  });
+  const countryOptions = useMemo(() => {
+    const displayNames = new Intl.DisplayNames(["en"], { type: "region" });
+    return (myCountries ?? []).map((c) => ({
+      code: c.country,
+      label: displayNames.of(c.country) ?? c.country,
+    }));
+  }, [myCountries]);
   const categoriesById = useMemo(
     () => new Map((categories ?? []).map((c) => [c.id, { name: c.name, color: c.color }])),
     [categories],
@@ -462,6 +477,24 @@ function TransactionsPage() {
               <SelectItem value="credit">Money in</SelectItem>
             </SelectContent>
           </Select>
+          {countryOptions.length > 1 ? (
+            <Select
+              value={search.country ?? "all"}
+              onValueChange={(value) => setSearch({ country: value === "all" ? undefined : value })}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All countries</SelectItem>
+                {countryOptions.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <DateField
             value={search.from ?? ""}
             onChange={(iso) => setSearch({ from: iso || undefined })}

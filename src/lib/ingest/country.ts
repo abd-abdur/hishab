@@ -85,6 +85,16 @@ const CURRENCY_COUNTRY: Record<string, string> = {
 const CURRENCY_AMOUNT_RE = /\b([A-Z]{3})\s*-?\d[\d,]*\.?\d*/;
 
 /**
+ * Trailing two-letter ISO tokens ("AMZN MKTP CA", "HM CA") — only checked as
+ * the LAST word, where card processors print the country; anywhere else two
+ * letters are too ambiguous.
+ */
+const TRAILING_ISO2 = new Set([
+  "AE", "CA", "US", "GB", "SA", "QA", "KW", "BH", "OM", "IN", "PK", "BD", "TR",
+  "EG", "TH", "MY", "SG", "ID", "FR", "DE", "ES", "IT", "NL", "JP", "AU",
+]);
+
+/**
  * A country the row's own text actually asserts — a country token, a known
  * city, or a foreign-currency marker. Null when the text carries no signal
  * (many banks print bare merchant names).
@@ -92,11 +102,13 @@ const CURRENCY_AMOUNT_RE = /\b([A-Z]{3})\s*-?\d[\d,]*\.?\d*/;
 export function countrySignal(description: string, statementCurrency: string): string | null {
   const text = description.toUpperCase();
 
-  const words = text.split(/[^A-Z]+/);
+  const words = text.split(/[^A-Z]+/).filter(Boolean);
   for (let i = words.length - 1; i >= 0; i--) {
     const token = COUNTRY_TOKENS[words[i] as string];
     if (token) return token;
   }
+  const last = words[words.length - 1];
+  if (last && last.length === 2 && TRAILING_ISO2.has(last) && words.length > 1) return last;
 
   for (const [pattern, country] of CITY_KEYWORDS) {
     if (pattern.test(text)) return country;

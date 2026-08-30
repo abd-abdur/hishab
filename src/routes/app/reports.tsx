@@ -23,8 +23,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDayTransactionsFn, getReportsFn } from "@/lib/app-data.functions";
-import { getCountryRefinementCandidatesFn, refineCountriesFn } from "@/lib/country.functions";
+import {
+  applyCountryFixesFn,
+  getCountryAuditRowsFn,
+  suggestCountriesFn,
+} from "@/lib/country.functions";
 import { decryptRows, decryptValue, LOCKED_VALUE } from "@/lib/enc-data";
+import { countrySignal, homeCountry } from "@/lib/ingest/country";
 import { getStoredKeys } from "@/lib/key-store";
 import { formatDateLong, formatMoney } from "@/lib/money";
 
@@ -120,9 +125,10 @@ function ReportsPage() {
     [data?.byCategory],
   );
 
-  // One-shot: rows ingested before merchant-country hints existed sit on the
-  // home-country default. Decrypt their merchant names here (only the browser
-  // can) and let the model refine — once per browser.
+  // One-shot recompute of every row's purchase country. Names are ciphertext
+  // server-side, so the browser decrypts them, keeps the rows whose text
+  // proves a country as anchors, and asks the model to place the rest by trip
+  // window — never by brand origin (a Dubai Tim Hortons stays AE).
   const queryClient = useQueryClient();
   const refineStarted = useRef(false);
   useEffect(() => {
@@ -130,23 +136,42 @@ function ReportsPage() {
     refineStarted.current = true;
     void (async () => {
       try {
-        if (localStorage.getItem("hishab-countries-refined")) return;
+        if (localStorage.getItem("hishab-countries-v2")) return;
         const keys = await getStoredKeys(session.userId);
         if (!keys) return;
-        const candidates = await getCountryRefinementCandidatesFn();
-        if (candidates.length < 3) return;
-        const merchants = (
-          await Promise.all(
-            candidates.map(async (c) => ({
-              token: c.token,
-              name: await decryptValue(keys, c.displayEnc),
-            })),
-          )
-        ).filter((m) => m.name !== LOCKED_VALUE);
-        if (merchants.length === 0) return;
-        const { updated } = await refineCountriesFn({ data: { merchants } });
-        localStorage.setItem("hishab-countries-refined", "1");
-        if (updated > 0) void queryClient.invalidateQueries({ queryKey: ["reports"] });
+        const audit = await getCountryAuditRowsFn();
+        if (audit.length === 0) return;
+        const home = homeCountry(audit[0]!.currency) ?? "AE";
+        const rows = await Promise.all(
+          audit.map(async (row, i) => {
+            const name = await decryptValue(keys, row.description);
+            return {
+              row,
+              i,
+              name: name === LOCKED_VALUE ? null : name.slice(0, 120),
+              anchor: name === LOCKED_VALUE ? null : countrySignal(name, row.currency),
+            };
+          }),
+        );
+        const payload = rows
+          .filter((r) => r.name)
+          .map((r) => ({ i: r.i, name: r.name as string, date: r.row.txnDate, anchor: r.anchor }));
+        if (payload.length === 0) return;
+        const { assignments } = await suggestCountriesFn({ data: { home, rows: payload } });
+        const suggested = new Map(assignments.map((a) => [a.i, a.country]));
+        const fixes = rows
+          .map((r) => ({
+            id: r.row.id,
+            country: r.anchor ?? suggested.get(r.i) ?? home,
+            stored: r.row.country,
+          }))
+          .filter((f) => f.country !== f.stored)
+          .map(({ id, country }) => ({ id, country }));
+        for (let at = 0; at < fixes.length; at += 400) {
+          await applyCountryFixesFn({ data: { fixes: fixes.slice(at, at + 400) } });
+        }
+        localStorage.setItem("hishab-countries-v2", "1");
+        if (fixes.length > 0) void queryClient.invalidateQueries({ queryKey: ["reports"] });
       } catch {
         // best-effort; next Reports visit retries
         refineStarted.current = false;
@@ -308,7 +333,10 @@ function ReportsPage() {
                             <CategoryDot color={c.color} />
                             <span className="min-w-0 flex-1 truncate">{c.name}</span>
                             <span className="num w-10 text-right text-xs text-muted-foreground">
-                              {countryTotal > 0 ? Math.round((c.spendMinor / countryTotal) * 100) : 0}%
+                              {countryTotal > 0
+                                ? Math.round((c.spendMinor / countryTotal) * 100)
+                                : 0}
+                              %
                             </span>
                             <Money
                               value={c.spendMinor}
@@ -383,8 +411,7 @@ function ReportsPage() {
                 <CardContent>
                   {month === "all" ? (
                     <p className="text-sm text-muted-foreground">
-                      The daily calendar is a one-month view. Pick a specific month above to see
-                      it.
+                      The daily calendar is a one-month view. Pick a specific month above to see it.
                     </p>
                   ) : (
                     <CashflowCalendar
@@ -460,7 +487,16 @@ function ReportsPage() {
 }
 
 /** Deterministic chart slot per country code — color follows the country, never its rank. */
-const COUNTRY_SLOTS = ["chart-2", "chart-5", "chart-7", "chart-9", "chart-11", "chart-4", "chart-8", "chart-12"];
+const COUNTRY_SLOTS = [
+  "chart-2",
+  "chart-5",
+  "chart-7",
+  "chart-9",
+  "chart-11",
+  "chart-4",
+  "chart-8",
+  "chart-12",
+];
 function countryColorSlot(code: string): string {
   let hash = 0;
   for (const ch of code) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
