@@ -32,6 +32,15 @@ export const SYSTEM_CATEGORIES: SystemCategory[] = [
     sortOrder: 2,
   },
   {
+    // food ordered through delivery platforms — distinct from eating out
+    slug: "online-orders",
+    name: "Online Orders",
+    icon: "bike",
+    color: "chart-14",
+    kind: "expense",
+    sortOrder: 2,
+  },
+  {
     slug: "transport",
     name: "Transport",
     icon: "car",

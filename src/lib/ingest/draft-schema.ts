@@ -16,6 +16,8 @@ export const DraftRowSchema = z.object({
   confidence: z.number().min(0).max(1),
   categoryId: z.string().min(1),
   categorySource: z.enum(["rule", "dictionary", "model", "user"]),
+  /** ISO 3166-1 alpha-2 merchant country, inferred from the row text at draft time. */
+  country: z.string().length(2).nullable().default(null),
   dedupHash: z.string().length(64),
   /** true when an identical transaction already exists in the account */
   duplicate: z.boolean(),

@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChartColumn } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CategoryDot } from "@/components/app/category-icon";
 import { EmptyState } from "@/components/app/empty-state";
@@ -23,7 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDayTransactionsFn, getReportsFn } from "@/lib/app-data.functions";
-import { decryptRows } from "@/lib/enc-data";
+import { getCountryRefinementCandidatesFn, refineCountriesFn } from "@/lib/country.functions";
+import { decryptRows, decryptValue, LOCKED_VALUE } from "@/lib/enc-data";
 import { getStoredKeys } from "@/lib/key-store";
 import { formatDateLong, formatMoney } from "@/lib/money";
 
@@ -119,6 +120,57 @@ function ReportsPage() {
     [data?.byCategory],
   );
 
+  // One-shot: rows ingested before merchant-country hints existed sit on the
+  // home-country default. Decrypt their merchant names here (only the browser
+  // can) and let the model refine — once per browser.
+  const queryClient = useQueryClient();
+  const refineStarted = useRef(false);
+  useEffect(() => {
+    if (refineStarted.current) return;
+    refineStarted.current = true;
+    void (async () => {
+      try {
+        if (localStorage.getItem("hishab-countries-refined")) return;
+        const keys = await getStoredKeys(session.userId);
+        if (!keys) return;
+        const candidates = await getCountryRefinementCandidatesFn();
+        if (candidates.length < 3) return;
+        const merchants = (
+          await Promise.all(
+            candidates.map(async (c) => ({
+              token: c.token,
+              name: await decryptValue(keys, c.displayEnc),
+            })),
+          )
+        ).filter((m) => m.name !== LOCKED_VALUE);
+        if (merchants.length === 0) return;
+        const { updated } = await refineCountriesFn({ data: { merchants } });
+        localStorage.setItem("hishab-countries-refined", "1");
+        if (updated > 0) void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      } catch {
+        // best-effort; next Reports visit retries
+        refineStarted.current = false;
+      }
+    })();
+  }, [session.userId, queryClient]);
+
+  // spend by merchant country: stable color per country code, never by rank
+  const countrySlices = useMemo(() => {
+    const rows = data?.byCountry ?? [];
+    const displayNames = new Intl.DisplayNames(["en"], { type: "region" });
+    return rows.map((row) => ({
+      categoryId: row.country ?? "unknown",
+      name: row.country ? (displayNames.of(row.country) ?? row.country) : "Unknown",
+      color: row.country ? countryColorSlot(row.country) : "chart-10",
+      spendMinor: row.spendMinor,
+      count: row.count,
+    }));
+  }, [data?.byCountry]);
+  const countryTotal = useMemo(
+    () => countrySlices.reduce((sum, c) => sum + c.spendMinor, 0),
+    [countrySlices],
+  );
+
   // biggest movers: latest trend month vs the one before it
   const movers = useMemo(() => {
     const trend = data?.categoryTrend ?? [];
@@ -210,6 +262,53 @@ function ReportsPage() {
                             <span className="min-w-0 flex-1 truncate">{c.name}</span>
                             <span className="num w-10 text-right text-xs text-muted-foreground">
                               {donutTotal > 0 ? Math.round((c.spendMinor / donutTotal) * 100) : 0}%
+                            </span>
+                            <Money
+                              value={c.spendMinor}
+                              currency={data?.currency ?? "AED"}
+                              className="text-sm text-muted-foreground"
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {month === "all" ? "All time by country" : `${monthLabel(month)} by country`}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Where the money was spent, judged from each row's merchant text
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {countrySlices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No spending this month.</p>
+                  ) : countrySlices.length === 1 ? (
+                    <p className="text-sm">
+                      All spending this period —{" "}
+                      <Money value={countryTotal} currency={data?.currency ?? "AED"} /> across{" "}
+                      {countrySlices[0]!.count} transactions — was in{" "}
+                      <span className="font-medium">{countrySlices[0]!.name}</span>.
+                    </p>
+                  ) : (
+                    <div className="grid items-center gap-4 sm:grid-cols-2">
+                      <CategoryDonut
+                        data={countrySlices}
+                        currency={data?.currency ?? "AED"}
+                        centerLabel={{ title: "total", value: countryTotal }}
+                      />
+                      <ul className="space-y-1.5 text-sm">
+                        {countrySlices.map((c) => (
+                          <li key={c.categoryId} className="flex items-center gap-2">
+                            <CategoryDot color={c.color} />
+                            <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                            <span className="num w-10 text-right text-xs text-muted-foreground">
+                              {countryTotal > 0 ? Math.round((c.spendMinor / countryTotal) * 100) : 0}%
                             </span>
                             <Money
                               value={c.spendMinor}
@@ -358,4 +457,12 @@ function ReportsPage() {
       </Dialog>
     </>
   );
+}
+
+/** Deterministic chart slot per country code — color follows the country, never its rank. */
+const COUNTRY_SLOTS = ["chart-2", "chart-5", "chart-7", "chart-9", "chart-11", "chart-4", "chart-8", "chart-12"];
+function countryColorSlot(code: string): string {
+  let hash = 0;
+  for (const ch of code) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return COUNTRY_SLOTS[hash % COUNTRY_SLOTS.length] as string;
 }

@@ -21,11 +21,23 @@ const MERCHANTS: Array<[norm: string, display: string, slug: string]> = [
   ["NESTO", "Nesto", "groceries"],
   ["NOON MINUTES", "Noon Minutes", "groceries"],
   ["ISTANBUL SUPERMARKET", "Istanbul Supermarket", "groceries"],
-  // Dining & delivery
-  ["TALABAT", "Talabat", "dining"],
-  ["DELIVEROO", "Deliveroo", "dining"],
-  ["ZOMATO", "Zomato", "dining"],
-  ["NOON FOOD", "Noon Food", "dining"],
+  // Food delivery platforms — Online Orders, distinct from restaurant dining
+  ["TALABAT", "Talabat", "online-orders"],
+  ["DELIVEROO", "Deliveroo", "online-orders"],
+  ["ZOMATO", "Zomato", "online-orders"],
+  ["NOON FOOD", "Noon Food", "online-orders"],
+  ["KEETA", "Keeta", "online-orders"],
+  ["MYF KEETA", "Keeta", "online-orders"],
+  ["DOORDASH", "DoorDash", "online-orders"],
+  ["UBER EATS", "Uber Eats", "online-orders"],
+  ["UBEREATS", "Uber Eats", "online-orders"],
+  ["CAREEM FOOD", "Careem Food", "online-orders"],
+  ["SMILES", "Smiles", "online-orders"],
+  ["HUNGERSTATION", "HungerStation", "online-orders"],
+  ["SKIP THE DISHES", "SkipTheDishes", "online-orders"],
+  ["GRUBHUB", "Grubhub", "online-orders"],
+  ["EATEASY", "EatEasy", "online-orders"],
+  // Dining — restaurants, cafés, in person
   ["MCDONALDS", "McDonald's", "dining"],
   ["KFC", "KFC", "dining"],
   ["STARBUCKS", "Starbucks", "dining"],
@@ -176,7 +188,10 @@ async function main() {
     await db
       .insert(merchantDictionary)
       .values({ merchantNorm: norm, displayName: display, categorySlug: slug })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: merchantDictionary.merchantNorm,
+        set: { displayName: display, categorySlug: slug },
+      });
   }
   console.log(`Seeded ${MERCHANTS.length} dictionary merchants`);
 }

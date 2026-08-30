@@ -22,6 +22,8 @@ import type { VerifiedTransaction } from "./verify";
 export type CategorizedTransaction = VerifiedTransaction & {
   categoryId: string;
   categorySource: "rule" | "dictionary" | "model" | "user";
+  /** ISO 3166-1 alpha-2 — the model's world knowledge of the merchant's country, when it has any */
+  countryHint: string | null;
 };
 
 type CategoryRow = { id: string; slug: string; name: string };
@@ -162,14 +164,16 @@ export async function categorizeTransactions(
     unknown.push(merchant);
   }
 
+  const countryHints = new Map<string, string | null>();
   if (unknown.length > 0) {
     const modelAssignments = await categorizeUnknownMerchants(unknown, transactions, categoryRows);
-    for (const [merchant, slug] of modelAssignments) {
-      const categoryId = bySlug.get(slug);
+    for (const [merchant, assignment] of modelAssignments) {
+      const categoryId = bySlug.get(assignment.categorySlug);
       resolved.set(merchant, {
         categoryId: categoryId ?? uncategorizedId,
         source: "model",
       });
+      countryHints.set(merchant, assignment.country);
     }
   }
 
@@ -179,6 +183,7 @@ export async function categorizeTransactions(
       ...t,
       categoryId: match?.categoryId ?? uncategorizedId,
       categorySource: match?.source ?? "model",
+      countryHint: countryHints.get(t.merchantNorm) ?? null,
     };
   });
 }
@@ -212,7 +217,7 @@ async function categorizeUnknownMerchants(
   merchants: string[],
   transactions: VerifiedTransaction[],
   categoryRows: CategoryRow[],
-): Promise<Map<string, string>> {
+): Promise<Map<string, { categorySlug: string; country: string | null }>> {
   const slugs = categoryRows.map((c) => c.slug);
   const samples = new Map<string, { description: string; direction: string }>();
   for (const t of transactions) {
@@ -226,6 +231,8 @@ async function categorizeUnknownMerchants(
       z.object({
         merchant: z.string(),
         categorySlug: z.string(),
+        /** ISO 3166-1 alpha-2 country of the merchant, or null when unsure */
+        country: z.string().nullable(),
       }),
     ),
   });
@@ -242,23 +249,27 @@ async function categorizeUnknownMerchants(
         model: categorizationModel(),
         schema,
         system: `Assign each merchant to exactly one category slug from this list: ${slugs.join(", ")}.
-Rules: use the sample transaction description and direction as context. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". Money clearly sent to another person is "p2p-out"; money clearly received from another person is "p2p-in". A credit line phrased like "payment received", "transfer received", or "thank you" on a card statement is the holder repaying their own card — always "transfers", never "p2p-in" and never "income". When genuinely unsure, use "uncategorized". Output one assignment per input merchant.`,
+Rules: use the sample transaction description and direction as context. Food ordered through delivery platforms and apps (Talabat, Deliveroo, Keeta, DoorDash, Uber Eats, Noon Food, and similar) is "online-orders" — "dining" is only for restaurants, cafés, and in-person food. "credit" direction with salary-like descriptions is "income"; refunds keep the merchant's normal category. Bank charges — FX/international spend markup, card fees, VAT lines, service charges — are "fees", never the category they relate to (an "international card spend fee" is NOT travel). Purchases made through buy-now-pay-later providers (Tabby, Tamara, Postpay) are "bnpl" — but credit-card repayments, autopay debits, "payment received" lines, and moves between the user's own accounts are "transfers", never "bnpl" and never "income". Money clearly sent to another person is "p2p-out"; money clearly received from another person is "p2p-in". A credit line phrased like "payment received", "transfer received", or "thank you" on a card statement is the holder repaying their own card — always "transfers", never "p2p-in" and never "income". When genuinely unsure, use "uncategorized". Also output "country": the ISO 3166-1 alpha-2 code of the country this merchant is most likely located in, judged from the merchant name and description (well-known chains and city names are strong signals; e.g. Tim Hortons is CA unless the text says otherwise). Use null when you genuinely don't know — never guess a country for a generic name. Output one assignment per input merchant.`,
         prompt: JSON.stringify(input),
         providerOptions: minimalThinking,
         abortSignal: AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS),
       }),
     );
     const valid = new Set(slugs);
-    const map = new Map<string, string>();
+    const map = new Map<string, { categorySlug: string; country: string | null }>();
     for (const a of result.object.assignments) {
-      map.set(a.merchant, valid.has(a.categorySlug) ? a.categorySlug : "uncategorized");
+      const country = a.country && /^[A-Z]{2}$/i.test(a.country) ? a.country.toUpperCase() : null;
+      map.set(a.merchant, {
+        categorySlug: valid.has(a.categorySlug) ? a.categorySlug : "uncategorized",
+        country,
+      });
     }
     // any merchant the model skipped falls back to uncategorized
     for (const m of merchants) {
-      if (!map.has(m)) map.set(m, "uncategorized");
+      if (!map.has(m)) map.set(m, { categorySlug: "uncategorized", country: null });
     }
     return map;
   } catch {
-    return new Map(merchants.map((m) => [m, "uncategorized"]));
+    return new Map(merchants.map((m) => [m, { categorySlug: "uncategorized", country: null }]));
   }
 }

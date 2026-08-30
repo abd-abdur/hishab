@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth.server";
 import { categorizeTransactions } from "@/lib/ingest/categorize.server";
 import type { DraftRow, IngestProgressEvent } from "@/lib/ingest/draft-schema";
 import { extractStatement, type IngestPage } from "@/lib/ingest/extract.server";
+import { inferCountry } from "@/lib/ingest/country";
 import { findExistingHashes, findSimilarRowKeys } from "@/lib/ingest/persist.server";
 import { redactAccountIdentifiers } from "@/lib/ingest/redact";
 import { dedupHashes, verifyStatement } from "@/lib/ingest/verify";
@@ -154,6 +155,7 @@ export const Route = createFileRoute("/api/ingest")({
 
               const rows: DraftRow[] = categorized.map((t, i) => ({
                 txnDate: t.txnDate,
+                country: inferCountry(t.description, verified.currency ?? "AED", t.countryHint),
                 description: t.description,
                 merchantNorm: t.merchantNorm,
                 merchantDisplay: t.merchantDisplay,
