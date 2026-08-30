@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db/client";
-import { budgets, categories, categoryRules, transactions } from "@/db/schema";
+import { budgets, categories, categoryRules, recurringDismissals, transactions } from "@/db/schema";
 import { getFreshness } from "@/lib/analytics/aggregates.server";
 import { CHART_SLOTS, nextChartSlot } from "@/lib/categories";
 import { authMiddleware } from "@/lib/auth-middleware";
@@ -180,4 +180,36 @@ export const createCategoryFn = createServerFn({ method: "POST" })
       sortOrder: 100,
     });
     return { id, slug };
+  });
+
+/**
+ * Mark a merchant "not a subscription" (or restore it). Stored per merchant
+ * key — an HMAC token in the encrypted era, opaque to the server — so the
+ * dismissal survives recurring-series regeneration on every ingest.
+ */
+export const setRecurringDismissedFn = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      merchantNorm: z.string().min(1).max(200),
+      dismissed: z.boolean(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    if (data.dismissed) {
+      await db
+        .insert(recurringDismissals)
+        .values({ userId: context.userId, merchantNorm: data.merchantNorm })
+        .onConflictDoNothing();
+    } else {
+      await db
+        .delete(recurringDismissals)
+        .where(
+          and(
+            eq(recurringDismissals.userId, context.userId),
+            eq(recurringDismissals.merchantNorm, data.merchantNorm),
+          ),
+        );
+    }
+    return { ok: true };
   });

@@ -20,6 +20,7 @@ export type TransactionRow = {
   categoryId: string;
   categorySource: "rule" | "dictionary" | "model" | "user";
   isAnomaly: boolean;
+  anomalyFactor: number | null;
   matchedTransfer: boolean;
 };
 
@@ -63,8 +64,16 @@ const Row = memo(function Row({
         <span className="block truncate font-medium">
           {row.merchantDisplay}
           {row.isAnomaly ? (
-            <Badge variant="outline" className="ml-2 align-middle text-[11px] text-warning">
-              unusual
+            <Badge
+              variant="outline"
+              className="ml-2 align-middle text-[11px] text-warning"
+              title={
+                row.anomalyFactor
+                  ? `About ${row.anomalyFactor.toFixed(1)}× the typical charge in this category`
+                  : "Well above the typical charge in this category"
+              }
+            >
+              {row.anomalyFactor ? `${row.anomalyFactor.toFixed(1)}× usual` : "unusual"}
             </Badge>
           ) : null}
           {row.matchedTransfer ? (

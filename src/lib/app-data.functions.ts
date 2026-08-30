@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, notExists, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db/client";
@@ -7,6 +7,7 @@ import {
   budgets,
   categories,
   categoryRules,
+  recurringDismissals,
   recurringSeries,
   statements,
   transactions,
@@ -23,6 +24,7 @@ import {
   type MonthKey,
 } from "@/lib/analytics/aggregates.server";
 import { getInsights } from "@/lib/analytics/insights.server";
+import { comingUpWindow } from "@/lib/analytics/recurring";
 import { authMiddleware } from "@/lib/auth-middleware";
 import { minorUnitFactor } from "@/lib/money";
 
@@ -45,6 +47,61 @@ export const getCategoriesFn = createServerFn({ method: "GET" })
       .orderBy(categories.sortOrder, categories.name);
     return rows;
   });
+
+/**
+ * Known recurring charges still ahead: active series whose next expected date
+ * falls inside the forward window, minus merchants the user dismissed. The
+ * headline total covers the WHOLE window even when more rows exist than shown.
+ */
+async function getComingUp(userId: string, month: string) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const window = comingUpWindow(todayIso, month);
+  const where = and(
+    eq(recurringSeries.userId, userId),
+    eq(recurringSeries.active, true),
+    gte(recurringSeries.nextExpected, window.from),
+    lte(recurringSeries.nextExpected, window.to),
+    notExists(
+      db
+        .select({ one: sql`1` })
+        .from(recurringDismissals)
+        .where(
+          and(
+            eq(recurringDismissals.userId, recurringSeries.userId),
+            eq(recurringDismissals.merchantNorm, recurringSeries.merchantNorm),
+          ),
+        ),
+    ),
+  );
+  const [rows, totals] = await Promise.all([
+    db
+      .select({
+        id: recurringSeries.id,
+        merchantDisplay: recurringSeries.merchantDisplay,
+        cadence: recurringSeries.cadence,
+        nextExpected: recurringSeries.nextExpected,
+        lastAmountMinor: recurringSeries.lastAmountMinor,
+        previousAmountMinor: recurringSeries.previousAmountMinor,
+        currency: recurringSeries.currency,
+      })
+      .from(recurringSeries)
+      .where(where)
+      .orderBy(recurringSeries.nextExpected)
+      .limit(6),
+    db
+      .select({
+        totalMinor: sql<string>`coalesce(sum(${recurringSeries.lastAmountMinor}), 0)`,
+      })
+      .from(recurringSeries)
+      .where(where),
+  ]);
+  return {
+    rows,
+    totalMinor: Number(totals[0]?.totalMinor ?? 0),
+    windowEnd: window.to,
+    windowLabel: window.label,
+  };
+}
 
 export const getDashboardFn = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -69,11 +126,10 @@ export const getDashboardFn = createServerFn({ method: "GET" })
         byCategory,
         kindTotals,
         budgetStatuses,
-        monthly,
         transferTotals,
         daily,
         recent,
-        upcoming,
+        comingUp,
         anomalies,
       ] = await Promise.all([
         getSpendByCategory(userId, from, to, currency0),
@@ -86,11 +142,8 @@ export const getDashboardFn = createServerFn({ method: "GET" })
           .innerJoin(categories, eq(transactions.categoryId, categories.id))
           .where(and(eq(transactions.userId, userId), eq(transactions.currency, currency0))),
         getBudgetStatuses(userId, today),
-        getMonthlyTotals(userId, 24, currency0),
         db
           .select({
-            outMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'debit'), 0)`,
-            inMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'credit'), 0)`,
             moveCount: sql<string>`count(*)`,
           })
           .from(transactions)
@@ -118,12 +171,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
           .where(eq(transactions.userId, userId))
           .orderBy(desc(transactions.txnDate), desc(transactions.createdAt))
           .limit(10),
-        db
-          .select()
-          .from(recurringSeries)
-          .where(and(eq(recurringSeries.userId, userId), eq(recurringSeries.active, true)))
-          .orderBy(recurringSeries.nextExpected)
-          .limit(4),
+        getComingUp(userId, "all"),
         db
           .select({
             id: transactions.id,
@@ -132,6 +180,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
             amountMinor: transactions.amountMinor,
             currency: transactions.currency,
             categoryId: transactions.categoryId,
+            anomalyFactor: transactions.anomalyFactor,
           })
           .from(transactions)
           .where(and(eq(transactions.userId, userId), eq(transactions.isAnomaly, true)))
@@ -158,14 +207,11 @@ export const getDashboardFn = createServerFn({ method: "GET" })
         byCategory,
         budgets: budgetStatuses,
         freshness,
-        monthly,
         transfers: {
-          outMinor: Number(transferTotals[0]?.outMinor ?? 0),
-          inMinor: Number(transferTotals[0]?.inMinor ?? 0),
           count: Number(transferTotals[0]?.moveCount ?? 0),
         },
         recent,
-        upcoming,
+        comingUp,
         anomalies,
       };
     }
@@ -199,7 +245,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
 
     // one parallel wave — the fewer sequential round trips to the database,
     // the faster the page paints
-    const [pace, byCategory, budgetStatuses, monthly, transferTotals, recent, upcoming, anomalies] =
+    const [pace, byCategory, budgetStatuses, monthly, transferTotals, recent, comingUp, anomalies] =
       await Promise.all([
         getPaceComparison(userId, anchor, currency),
         getSpendByCategory(userId, monthFrom, monthTo, currency),
@@ -207,8 +253,6 @@ export const getDashboardFn = createServerFn({ method: "GET" })
         getMonthlyTotals(userId, 6, currency),
         db
           .select({
-            outMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'debit'), 0)`,
-            inMinor: sql<string>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.direction} = 'credit'), 0)`,
             moveCount: sql<string>`count(*)`,
           })
           .from(transactions)
@@ -237,12 +281,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
           .where(eq(transactions.userId, userId))
           .orderBy(desc(transactions.txnDate), desc(transactions.createdAt))
           .limit(10),
-        db
-          .select()
-          .from(recurringSeries)
-          .where(and(eq(recurringSeries.userId, userId), eq(recurringSeries.active, true)))
-          .orderBy(recurringSeries.nextExpected)
-          .limit(4),
+        getComingUp(userId, month),
         db
           .select({
             id: transactions.id,
@@ -251,6 +290,7 @@ export const getDashboardFn = createServerFn({ method: "GET" })
             amountMinor: transactions.amountMinor,
             currency: transactions.currency,
             categoryId: transactions.categoryId,
+            anomalyFactor: transactions.anomalyFactor,
           })
           .from(transactions)
           .where(and(eq(transactions.userId, userId), eq(transactions.isAnomaly, true)))
@@ -268,14 +308,11 @@ export const getDashboardFn = createServerFn({ method: "GET" })
       byCategory,
       budgets: budgetStatuses,
       freshness,
-      monthly,
       transfers: {
-        outMinor: Number(transferTotals[0]?.outMinor ?? 0),
-        inMinor: Number(transferTotals[0]?.inMinor ?? 0),
         count: Number(transferTotals[0]?.moveCount ?? 0),
       },
       recent,
-      upcoming,
+      comingUp,
       anomalies,
     };
   });
@@ -340,6 +377,7 @@ const TransactionFiltersSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   statementId: z.string().optional(),
+  anomaly: z.boolean().optional(),
   offset: z.number().int().nonnegative().default(0),
   limit: z.number().int().min(1).max(500).default(200),
 });
@@ -361,6 +399,7 @@ function transactionConditions(userId: string, f: TransactionFilters) {
   if (f.from) conditions.push(gte(transactions.txnDate, f.from));
   if (f.to) conditions.push(lte(transactions.txnDate, f.to));
   if (f.statementId) conditions.push(eq(transactions.statementId, f.statementId));
+  if (f.anomaly) conditions.push(eq(transactions.isAnomaly, true));
   return and(...conditions);
 }
 
@@ -383,6 +422,7 @@ export const getTransactionsFn = createServerFn({ method: "GET" })
           categoryId: transactions.categoryId,
           categorySource: transactions.categorySource,
           isAnomaly: transactions.isAnomaly,
+          anomalyFactor: transactions.anomalyFactor,
           statementId: transactions.statementId,
           // an internal move seen from both accounts: this transfer row has an
           // opposite-direction twin (same amount, ±3 days) in another statement.
@@ -439,44 +479,6 @@ export const getTransactionsFn = createServerFn({ method: "GET" })
     };
   });
 
-export const exportTransactionsFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(TransactionFiltersSchema)
-  .handler(async ({ data, context }) => {
-    const where = transactionConditions(context.userId, data);
-    const rows = await db
-      .select({
-        txnDate: transactions.txnDate,
-        description: transactions.description,
-        merchant: transactions.merchantDisplay,
-        amountMinor: transactions.amountMinor,
-        direction: transactions.direction,
-        currency: transactions.currency,
-        category: categories.name,
-      })
-      .from(transactions)
-      .innerJoin(categories, eq(transactions.categoryId, categories.id))
-      .where(where)
-      .orderBy(desc(transactions.txnDate))
-      .limit(20000);
-
-    const escapeCsv = (value: string) =>
-      /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-    const header = "Date,Description,Merchant,Category,Direction,Amount,Currency";
-    const lines = rows.map((r) =>
-      [
-        r.txnDate,
-        escapeCsv(r.description),
-        escapeCsv(r.merchant),
-        escapeCsv(r.category),
-        r.direction,
-        (r.direction === "debit" ? -r.amountMinor : r.amountMinor) / minorUnitFactor(r.currency),
-        r.currency,
-      ].join(","),
-    );
-    return { csv: [header, ...lines].join("\n"), count: rows.length };
-  });
-
 export const getStatementsFn = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -490,11 +492,25 @@ export const getStatementsFn = createServerFn({ method: "GET" })
 export const getRecurringFn = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    return db
-      .select()
-      .from(recurringSeries)
-      .where(eq(recurringSeries.userId, context.userId))
-      .orderBy(recurringSeries.nextExpected);
+    const [rows, dismissals] = await Promise.all([
+      db
+        .select()
+        .from(recurringSeries)
+        .where(eq(recurringSeries.userId, context.userId))
+        .orderBy(recurringSeries.nextExpected),
+      db
+        .select({ merchantNorm: recurringDismissals.merchantNorm })
+        .from(recurringDismissals)
+        .where(eq(recurringDismissals.userId, context.userId)),
+    ]);
+    const dismissedSet = new Set(dismissals.map((d) => d.merchantNorm));
+    return rows.map((r) => ({
+      ...r,
+      dismissed: dismissedSet.has(r.merchantNorm),
+      priceSteps: r.priceSteps
+        ? (JSON.parse(r.priceSteps) as Array<{ date: string; amountMinor: number }>)
+        : null,
+    }));
   });
 
 export const getBudgetsFn = createServerFn({ method: "GET" })
@@ -538,25 +554,44 @@ export const getReportsFn = createServerFn({ method: "GET" })
     const { from, to } = allTime
       ? { from: freshness.earliestDate ?? todayIso, to: todayIso }
       : monthRange(data.month as MonthKey);
+    // the stacked category trend spans the last 6 months for a month view,
+    // but the full history when "all time" is selected
+    const trendFrom = allTime
+      ? from
+      : new Date(new Date().getFullYear(), new Date().getMonth() - 6, 1).toISOString().slice(0, 10);
 
-    const [monthly, daily, topMerchants, byCategory, trendResult] = await Promise.all([
-      getMonthlyTotals(userId, allTime ? 24 : 12, currency),
-      // the daily calendar is a month-shaped view; all-time skips it
-      allTime ? Promise.resolve([]) : getDailySpend(userId, from, to, currency),
-      getTopMerchants(userId, from, to, currency, allTime ? 15 : 12),
-      getSpendByCategory(userId, from, to, currency),
-      db.execute(sql`
+    const [monthly, daily, topMerchants, byCategory, countryResult, trendResult] =
+      await Promise.all([
+        getMonthlyTotals(userId, allTime ? 24 : 12, currency),
+        // the daily calendar is a month-shaped view; all-time skips it
+        allTime ? Promise.resolve([]) : getDailySpend(userId, from, to, currency),
+        getTopMerchants(userId, from, to, currency, allTime ? 15 : 12),
+        getSpendByCategory(userId, from, to, currency),
+        // spend by merchant country — expense categories only, debits net of refunds
+        db.execute(sql`
+        SELECT t.country,
+               sum(CASE WHEN t.direction = 'debit' THEN t.amount_minor ELSE -t.amount_minor END) AS spend_minor,
+               count(*) AS txn_count
+        FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        WHERE t.user_id = ${userId} AND t.currency = ${currency} AND c.kind = 'expense'
+          AND t.txn_date >= ${from} AND t.txn_date <= ${to}
+        GROUP BY 1
+        HAVING sum(CASE WHEN t.direction = 'debit' THEN t.amount_minor ELSE -t.amount_minor END) > 0
+        ORDER BY 2 DESC
+      `),
+        db.execute(sql`
         SELECT to_char(date_trunc('month', t.txn_date), 'YYYY-MM') AS month,
                c.id AS category_id, c.name, c.color,
                sum(CASE WHEN t.direction = 'debit' THEN t.amount_minor ELSE -t.amount_minor END) AS spend_minor
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
         WHERE t.user_id = ${userId} AND t.currency = ${currency} AND c.kind = 'expense'
-          AND t.txn_date >= date_trunc('month', now())::date - interval '6 months'
+          AND t.txn_date >= ${trendFrom}
         GROUP BY 1, 2, 3, 4
         ORDER BY 1
       `),
-    ]);
+      ]);
 
     const categoryTrend = (trendResult.rows as Array<Record<string, unknown>>).map((r) => ({
       month: String(r["month"]),
@@ -566,7 +601,22 @@ export const getReportsFn = createServerFn({ method: "GET" })
       spendMinor: Number(r["spend_minor"] ?? 0),
     }));
 
-    return { monthly, daily, topMerchants, byCategory, categoryTrend, currency, allTime };
+    const byCountry = (countryResult.rows as Array<Record<string, unknown>>).map((r) => ({
+      country: r["country"] == null ? null : String(r["country"]),
+      spendMinor: Number(r["spend_minor"] ?? 0),
+      count: Number(r["txn_count"] ?? 0),
+    }));
+
+    return {
+      monthly,
+      daily,
+      topMerchants,
+      byCategory,
+      byCountry,
+      categoryTrend,
+      currency,
+      allTime,
+    };
   });
 
 /** Day-level transactions for the calendar drill-down. */

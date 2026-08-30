@@ -21,6 +21,7 @@ export type RecurringInput = {
 const HABIT_CATEGORY_SLUGS = new Set([
   "groceries",
   "dining",
+  "online-orders",
   "transport",
   "fuel",
   "shopping",
@@ -44,6 +45,8 @@ export type DetectedSeries = {
   occurrences: number;
   lastSeen: string;
   nextExpected: string;
+  /** distinct billing amounts over time, oldest first; length 1 = never changed */
+  priceSteps: Array<{ date: string; amountMinor: number }>;
 };
 
 const CADENCES: Array<{ name: DetectedSeries["cadence"]; days: number }> = [
@@ -101,6 +104,20 @@ export function detectRecurringSeries(transactions: RecurringInput[]): DetectedS
     const cv = Math.sqrt(variance) / mean;
     if (modeShare < 0.6 && cv >= 0.08) continue;
 
+    // Price history: a new step whenever the amount moves >2% from the
+    // current step (the same tolerance as the price-change check below).
+    const priceSteps: Array<{ date: string; amountMinor: number }> = [];
+    for (const t of sorted) {
+      const step = priceSteps[priceSteps.length - 1];
+      if (
+        !step ||
+        (step.amountMinor > 0 &&
+          Math.abs(t.amountMinor - step.amountMinor) / step.amountMinor > 0.02)
+      ) {
+        priceSteps.push({ date: t.txnDate, amountMinor: t.amountMinor });
+      }
+    }
+
     const last = sorted[sorted.length - 1]!;
     const priorAmounts = amounts.slice(0, -1);
     const priorMedian = median(priorAmounts);
@@ -124,8 +141,27 @@ export function detectRecurringSeries(transactions: RecurringInput[]): DetectedS
       occurrences: sorted.length,
       lastSeen: last.txnDate,
       nextExpected: nextExpected.toISOString().slice(0, 10),
+      priceSteps,
     });
   }
 
   return series.sort((a, b) => (a.nextExpected < b.nextExpected ? -1 : 1));
+}
+
+/**
+ * Forward-looking window for the "Coming up" card. Only the current month has
+ * a future inside it — for a past month or "all time", the honest window is
+ * the next 30 days.
+ */
+export function comingUpWindow(
+  todayIso: string,
+  month: string, // "all" | "YYYY-MM"
+): { from: string; to: string; label: "this month" | "next 30 days" } {
+  if (month === todayIso.slice(0, 7)) {
+    const [y, m] = month.split("-").map(Number);
+    const monthEnd = new Date(Date.UTC(y as number, m as number, 0));
+    return { from: todayIso, to: monthEnd.toISOString().slice(0, 10), label: "this month" };
+  }
+  const to = new Date(new Date(`${todayIso}T00:00:00Z`).getTime() + 30 * DAY_MS);
+  return { from: todayIso, to: to.toISOString().slice(0, 10), label: "next 30 days" };
 }

@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeftRight, Download, Search, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Download, Search, X } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -39,6 +39,7 @@ const SearchSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   statement: z.string().optional(),
+  anomaly: z.boolean().optional(),
 });
 
 export const Route = createFileRoute("/app/transactions")({
@@ -64,6 +65,7 @@ function TransactionsPage() {
       from: search.from,
       to: search.to,
       statementId: search.statement,
+      anomaly: search.anomaly,
     }),
     [search],
   );
@@ -333,7 +335,13 @@ function TransactionsPage() {
   });
 
   const hasFilters = Boolean(
-    search.q || search.cat || search.dir || search.from || search.to || search.statement,
+    search.q ||
+    search.cat ||
+    search.dir ||
+    search.from ||
+    search.to ||
+    search.statement ||
+    search.anomaly,
   );
 
   return (
@@ -466,6 +474,15 @@ function TransactionsPage() {
             label="To date"
             placeholder="To dd/mm/yyyy"
           />
+          <Button
+            variant={search.anomaly ? "secondary" : "outline"}
+            size="sm"
+            aria-pressed={Boolean(search.anomaly)}
+            onClick={() => setSearch({ anomaly: search.anomaly ? undefined : true })}
+          >
+            <AlertTriangle className="size-4" />
+            Unusual only
+          </Button>
           {hasFilters ? (
             <Button
               variant="ghost"

@@ -50,6 +50,7 @@ export async function commitStatement(userId: string, input: CommitInput): Promi
         currency: meta.currency,
         categoryId: row.categoryId,
         categorySource: row.categorySource,
+        country: row.country,
         confidence: row.confidence,
         dedupHash: row.dedupHash,
       })),
@@ -142,6 +143,7 @@ export async function refreshRecurringSeries(userId: string): Promise<void> {
         lastSeen: s.lastSeen,
         nextExpected: s.nextExpected,
         active: true,
+        priceSteps: JSON.stringify(s.priceSteps),
       })),
     );
   }
@@ -170,15 +172,37 @@ async function refreshAnomalyFlags(userId: string): Promise<void> {
       AND m.sample_count >= 4
       AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
       false
-    )
-    FROM categories c
-    LEFT JOIN category_medians m ON m.category_id = c.id
-    WHERE t.user_id = ${userId} AND t.category_id = c.id
-      AND t.is_anomaly != COALESCE(
+    ),
+    anomaly_factor = CASE
+      WHEN COALESCE(
         t.direction = 'debit'
         AND m.sample_count >= 4
         AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
         false
+      )
+      THEN t.amount_minor::double precision / NULLIF(m.median_amount, 0)
+      ELSE NULL
+    END
+    FROM categories c
+    LEFT JOIN category_medians m ON m.category_id = c.id
+    WHERE t.user_id = ${userId} AND t.category_id = c.id
+      AND (
+        t.is_anomaly != COALESCE(
+          t.direction = 'debit'
+          AND m.sample_count >= 4
+          AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
+          false
+        )
+        OR t.anomaly_factor IS DISTINCT FROM (CASE
+          WHEN COALESCE(
+            t.direction = 'debit'
+            AND m.sample_count >= 4
+            AND t.amount_minor > GREATEST(m.median_amount * 3, 10000),
+            false
+          )
+          THEN t.amount_minor::double precision / NULLIF(m.median_amount, 0)
+          ELSE NULL
+        END)
       )
   `);
 }

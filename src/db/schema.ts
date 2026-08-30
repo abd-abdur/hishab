@@ -186,8 +186,12 @@ export const transactions = pgTable(
     categorySource: text("category_source", {
       enum: ["rule", "dictionary", "model", "user"],
     }).notNull(),
+    /** ISO 3166-1 alpha-2 merchant country, inferred deterministically from row text at draft time. */
+    country: text("country"),
     confidence: real("confidence").notNull().default(1),
     isAnomaly: boolean("is_anomaly").notNull().default(false),
+    /** amount ÷ category median at flag time; null when not an anomaly */
+    anomalyFactor: real("anomaly_factor"),
     dedupHash: text("dedup_hash").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -265,9 +269,29 @@ export const recurringSeries = pgTable(
     lastSeen: date("last_seen").notNull(),
     nextExpected: date("next_expected"),
     active: boolean("active").notNull().default(true),
+    /** JSON [{date, amountMinor}], one entry per detected price step, oldest first */
+    priceSteps: text("price_steps"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("recurring_user_merchant_idx").on(t.userId, t.merchantNorm, t.cadence)],
+);
+
+/**
+ * Merchants the user marked "not a subscription". Kept separate from
+ * recurring_series because that table is deleted and regenerated on every
+ * ingest — only a keyed table survives regeneration and re-detection.
+ * merchantNorm is opaque to the server (HMAC token, or legacy plaintext norm).
+ */
+export const recurringDismissals = pgTable(
+  "recurring_dismissals",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    merchantNorm: text("merchant_norm").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("recurring_dismissals_idx").on(t.userId, t.merchantNorm)],
 );
 
 /**

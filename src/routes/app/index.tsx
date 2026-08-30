@@ -35,6 +35,14 @@ export const Route = createFileRoute("/app/")({
   component: DashboardPage,
 });
 
+/** The month's first and last day as transaction-filter bounds; empty for all-time. */
+function monthBounds(month: string): { from?: string; to?: string } {
+  if (month === "all") return {};
+  const [year, m] = month.split("-").map(Number);
+  const lastDay = new Date(year as number, m as number, 0).getDate();
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+
 function monthName(month: string): string {
   if (month === "all") return "all time";
   const [year, m] = month.split("-");
@@ -71,12 +79,12 @@ function DashboardPage() {
     queryFn: async () => {
       const result = await getDashboardFn({ data: m ? { month: m } : {} });
       const keys = await getStoredKeys(session.userId);
-      const [recent, upcoming, anomalies] = await Promise.all([
+      const [recent, comingUpRows, anomalies] = await Promise.all([
         decryptRows(keys, result.recent, ["description", "merchantDisplay"]),
-        decryptRows(keys, result.upcoming, ["merchantDisplay"]),
+        decryptRows(keys, result.comingUp.rows, ["merchantDisplay"]),
         decryptRows(keys, result.anomalies, ["merchantDisplay"]),
       ]);
-      return { ...result, recent, upcoming, anomalies };
+      return { ...result, recent, comingUp: { ...result.comingUp, rows: comingUpRows }, anomalies };
     },
     staleTime: 60_000,
   });
@@ -136,6 +144,18 @@ function DashboardPage() {
   }
 
   const { pace, budgets, byCategory, freshness } = data;
+
+  // A forecast from week-old statements is a guess wearing a number — say so.
+  const staleDays = freshness.latestDate
+    ? Math.floor(
+        (Date.now() - new Date(`${freshness.latestDate.slice(0, 10)}T00:00:00`).getTime()) /
+          86_400_000,
+      )
+    : null;
+  const staleDataNote =
+    staleDays != null && staleDays > 7 && freshness.latestDate
+      ? ` · based on statements through ${formatDate(freshness.latestDate)}`
+      : "";
 
   // A percentage is only honest when the previous month's statements actually
   // covered the compared window and the base isn't trivially small.
@@ -270,7 +290,12 @@ function DashboardPage() {
                   limitMinor: budgetByCategory.get(c.categoryId),
                 }))}
                 onSelect={(categoryId) =>
-                  void navigate({ to: "/app/transactions", search: { cat: categoryId } })
+                  void navigate({
+                    to: "/app/transactions",
+                    // carry the dashboard's month into the filter — "July
+                    // dining" must never show August rows
+                    search: { cat: categoryId, ...monthBounds(data.month) },
+                  })
                 }
               />
             )}
@@ -280,7 +305,7 @@ function DashboardPage() {
                 your own accounts — money that changed pockets, not spending ·{" "}
                 <Link
                   to="/app/transactions"
-                  search={{ cat: "sys_transfers" }}
+                  search={{ cat: "sys_transfers", ...monthBounds(data.month) }}
                   className="font-medium text-primary hover:underline"
                 >
                   view them
@@ -294,37 +319,55 @@ function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <CalendarClock className="size-4 text-muted-foreground" />
-              Recurring next up
+              Coming up
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.upcoming.length === 0 ? (
+            {data.comingUp.rows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No recurring charges detected yet. They appear after a few months of history.
+                No known charges due{" "}
+                {data.comingUp.windowLabel === "this month"
+                  ? "for the rest of this month"
+                  : "in the next 30 days"}
+                . Recurring charges appear after a few months of history.
               </p>
             ) : (
-              data.upcoming.map((series) => (
-                <div key={series.id} className="flex items-center justify-between gap-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{series.merchantDisplay}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {series.nextExpected
-                        ? `Expected ${formatDate(series.nextExpected)}`
-                        : series.cadence}
-                      {series.previousAmountMinor != null ? (
-                        <Badge variant="outline" className="ml-1.5 text-warning">
-                          price change
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                  <Money
-                    value={series.lastAmountMinor}
-                    currency={series.currency}
-                    className="text-sm"
-                  />
+              <>
+                <div>
+                  <span className="num text-lg font-semibold">
+                    {formatMoney(data.comingUp.totalMinor, data.currency)}
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    in known recurring charges{" "}
+                    {data.comingUp.windowLabel === "this month"
+                      ? "still to come this month"
+                      : "expected in the next 30 days"}
+                    {staleDataNote}
+                  </p>
                 </div>
-              ))
+                {data.comingUp.rows.map((series) => (
+                  <div key={series.id} className="flex items-center justify-between gap-2 text-sm">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{series.merchantDisplay}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {series.nextExpected
+                          ? `Expected ${formatDate(series.nextExpected)}`
+                          : series.cadence}
+                        {series.previousAmountMinor != null ? (
+                          <Badge variant="outline" className="ml-1.5 text-warning">
+                            price change
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                    <Money
+                      value={series.lastAmountMinor}
+                      currency={series.currency}
+                      className="text-sm"
+                    />
+                  </div>
+                ))}
+              </>
             )}
             <Link
               to="/app/recurring"
@@ -407,7 +450,10 @@ function DashboardPage() {
                       <div className="truncate font-medium">{txn.merchantDisplay}</div>
                       <div className="text-xs text-muted-foreground">
                         {formatDate(txn.txnDate)}
-                        {category ? ` · ${category.name}` : ""} · well above your usual
+                        {category ? ` · ${category.name}` : ""} ·{" "}
+                        {txn.anomalyFactor
+                          ? `${txn.anomalyFactor.toFixed(1)}× your usual ${category ? category.name.toLowerCase() : ""} charge`
+                          : "well above your usual"}
                       </div>
                     </div>
                     <Money value={txn.amountMinor} currency={txn.currency} className="text-sm" />
@@ -415,6 +461,15 @@ function DashboardPage() {
                 );
               })
             )}
+            {data.anomalies.length > 0 ? (
+              <Link
+                to="/app/transactions"
+                search={{ anomaly: true }}
+                className="block pt-1 text-sm font-medium text-primary hover:underline"
+              >
+                See all unusual charges
+              </Link>
+            ) : null}
           </CardContent>
         </Card>
       </div>
